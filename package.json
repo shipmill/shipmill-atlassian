@@ -1,0 +1,17 @@
+{
+  "name": "shipmill-atlassian",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "workspaces": ["shared", "jira", "bitbucket"],
+  "scripts": {
+    "typecheck": "tsc -p shared && tsc -p jira && tsc -p bitbucket",
+    "test": "node --import tsx --test 'shared/src/**/*.test.ts' 'jira/src/**/*.test.ts' 'bitbucket/src/**/*.test.ts'",
+    "lint": "npm run lint --workspace jira && npm run lint --workspace bitbucket"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

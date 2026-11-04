@@ -1,0 +1,35 @@
+modules:
+  jira:adminPage:
+    - key: settings
+      title: shipmill Release Decisions
+      resource: admin
+      resolver:
+        function: settings-resolver
+      render: native
+  webtrigger:
+    - key: bridge
+      function: on-bridge-request
+      response:
+        type: dynamic
+  llm:
+    - key: decisions-llm
+      model:
+        - claude
+  function:
+    - key: on-bridge-request
+      handler: index.onBridgeRequest
+    - key: settings-resolver
+      handler: index.settingsResolver
+resources:
+  - key: admin
+    path: src/frontend/admin.tsx
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - storage:app
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64

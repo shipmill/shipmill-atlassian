@@ -1,0 +1,11 @@
+{
+  "name": "@shipmill-atlassian/shared",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./bridge": "./src/bridge.ts",
+    "./jira-key": "./src/jira-key.ts",
+    "./adf": "./src/adf.ts"
+  }
+}

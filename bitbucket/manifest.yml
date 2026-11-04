@@ -1,0 +1,36 @@
+modules:
+  bitbucket:workspaceSettingsMenuPage:
+    - key: settings
+      title: shipmill Release Decisions
+      resource: settings
+      resolver:
+        function: settings-resolver
+      render: native
+  trigger:
+    - key: pull-request-events
+      function: on-pull-request
+      events:
+        - avi:bitbucket:created:pullrequest
+  function:
+    - key: on-pull-request
+      handler: index.onPullRequest
+    - key: settings-resolver
+      handler: index.settingsResolver
+resources:
+  - key: settings
+    path: src/frontend/settings.tsx
+permissions:
+  scopes:
+    - read:pullrequest:bitbucket
+    - write:pullrequest:bitbucket
+    - storage:app
+  external:
+    fetch:
+      backend:
+        # Forge web triggers, the Jira app's included; jiraTriggerUrl() checks the host again
+        - address: '*.hello.atlassian-dev.net'
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
