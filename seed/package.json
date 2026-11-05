@@ -1,0 +1,12 @@
+{
+  "name": "@shipmill-atlassian/seed",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "seed": "node --import tsx src/main.ts"
+  },
+  "dependencies": {
+    "@shipmill-atlassian/shared": "*"
+  }
+}
