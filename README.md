@@ -63,7 +63,9 @@ npm run seed -- --jira-site example.atlassian.net --bitbucket-workspace example 
 npm run seed -- --jira-site example.atlassian.net --bitbucket-workspace example
 ```
 
-`--dry-run` only reads and prints the plan. `--project-key` and `--repository` change the
+`--dry-run` only reads and prints the plan. Branch names and pull request titles carry the
+work item keys, so before the Jira work items exist a dry run plans Jira only and leaves out
+the Bitbucket changes. `--project-key` and `--repository` change the
 names. The seed finds its own work items through a project property, `shipmill-seed`, that
 maps each seed item to the work item made for it; a work item deleted by hand is made again.
 
