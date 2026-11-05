@@ -1,6 +1,7 @@
 import type { ChatResponse, Prompt } from '@forge/llm';
 import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { list, nonEmpty, object, string } from '@shipmill-atlassian/shared/parse';
+import { logUsage, toolArguments } from './llm-tool';
 import { NEEDS_DECISION, commentId, type Release } from '@shipmill-atlassian/shared/release';
 import { ImplicitDecisionError, type ImplicitDecision, type ImplicitFinder } from './finder';
 
@@ -83,15 +84,7 @@ export function prompt(release: Release): Prompt {
 }
 
 export function parseResponse(response: ChatResponse): ImplicitDecision[] {
-  const choice = response.choices[0];
-  if (choice === undefined) throw new ImplicitDecisionError('the LLM returned no choice');
-  const calls = (choice.message.tool_calls ?? []).filter((call) => call.function.name === TOOL);
-  if (calls.length !== 1) {
-    throw new ImplicitDecisionError(`expected one ${TOOL} call, got ${calls.length} (finish_reason ${choice.finish_reason})`);
-  }
-  // The type says the arguments arrive parsed; a raw JSON string is read the same way
-  const raw: unknown = calls[0]?.function.arguments;
-  const args = object(typeof raw === 'string' ? JSON.parse(raw) : raw, TOOL);
+  const args = toolArguments(response, TOOL, (message) => new ImplicitDecisionError(message));
   return list(args.decisions, `${TOOL}.decisions`, (value, path) => {
     const fields = object(value, path);
     return {
@@ -108,8 +101,7 @@ export function llmFinder(chat: Chat, log: (line: string) => void = console.log)
     async find(release) {
       const started = Date.now();
       const response = await chat(prompt(release));
-      const usage = response.usage;
-      log(`llm finder ${release.project} ${release.version}: ${Date.now() - started} ms, ${usage?.input_tokens ?? '?'} in / ${usage?.output_tokens ?? '?'} out`);
+      logUsage(log, `llm finder ${release.project} ${release.version}`, started, response);
       return parseResponse(response);
     },
   };

@@ -12,20 +12,21 @@ on. Both read only through Atlassian's own APIs, with the scopes the install scr
 
 Per install, in Atlassian's Forge storage: the secret that pairs the two apps, the Jira app's
 web trigger address (in the Bitbucket app), and whether Claude is switched on. What the apps
-write back, comments, labels and pull request tasks, lives in your Jira and Bitbucket like any
-other comment.
+write back, comments, labels, pull request tasks, and the `shipmill-decision` property on a
+work item (the question asked, its options, who decides and their answer), lives in your Jira
+and Bitbucket like any other comment.
 
 ## Where data goes
 
 Nowhere outside Atlassian. The apps run on Atlassian's Forge platform. When Claude is on, the
-Jira app sends work item text to Forge LLMs, which Atlassian hosts; switch it off on the app's
+Jira app sends work item text and replies to its questions to Forge LLMs, which Atlassian hosts; switch it off on the app's
 settings page and nothing is sent. The Bitbucket app sends pull request titles and links to the
 Jira app it is paired with, through that app's Forge web trigger. The authors of the apps
 receive no data from your site: no analytics, no tracking, no copies.
 
 ## Removing data
 
-Uninstalling an app deletes its Forge storage. Comments and labels the apps wrote stay in Jira
+Uninstalling an app deletes its Forge storage. Comments, labels and properties the apps wrote stay in Jira
 and Bitbucket until you delete them.
 
 ## Contact
