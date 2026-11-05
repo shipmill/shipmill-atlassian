@@ -31,3 +31,20 @@ export const forgeJiraRest: JiraRest = {
     return response.json();
   },
 };
+
+// One work item by key, or undefined when the site has none by that key (a pull request
+// title can name any key). Kept apart from JiraRest so the release fixtures stay as they are.
+export interface IssueRest {
+  issue(key: JiraKey, fields: string[]): Promise<unknown | undefined>;
+}
+
+export const forgeIssueRest: IssueRest = {
+  async issue(key, fields) {
+    const response = await api
+      .asApp()
+      .requestJira(route`/rest/api/3/issue/${key}?fields=${fields.join(',')}`, { headers: { Accept: 'application/json' } });
+    if (response.status === 404) return undefined;
+    if (!response.ok) throw new Error(`Jira returned ${response.status} reading ${key}: ${await response.text()}`);
+    return response.json();
+  },
+};

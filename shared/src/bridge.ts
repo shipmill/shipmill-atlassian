@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { findJiraKey, type JiraKey } from './jira-key';
 
 // The Bitbucket app tells the Jira app about pull requests through the Jira app's web trigger.
 // The trigger URL is public, so each body is signed with a secret the two installs share,
@@ -19,7 +20,10 @@ export type PullRequestOpened = {
 
 export type Ping = { kind: 'ping'; sentAt: number };
 
-export type BridgeMessage = Ping | PullRequestOpened;
+// Asks for the work item a pull request names; the Jira app answers with a WorkItemStatus
+export type WorkItemQuery = { kind: 'work-item'; sentAt: number; key: JiraKey };
+
+export type BridgeMessage = Ping | PullRequestOpened | WorkItemQuery;
 
 export type BridgeErrorCode = 'bad-signature' | 'stale' | 'malformed';
 
@@ -83,6 +87,8 @@ function parse(fields: Record<string, unknown>): BridgeMessage {
         title: text(fields, 'title'),
         url: text(fields, 'url'),
       };
+    case 'work-item':
+      return { kind: 'work-item', sentAt, key: workItemKey(fields) };
     default:
       throw new BridgeError('malformed', `unknown kind ${JSON.stringify(fields.kind)}`);
   }
@@ -92,6 +98,12 @@ function text(fields: Record<string, unknown>, name: string): string {
   const value = fields[name];
   if (typeof value !== 'string' || value === '') throw new BridgeError('malformed', `${name} is not a non-empty string`);
   return value;
+}
+
+function workItemKey(fields: Record<string, unknown>): JiraKey {
+  const value = text(fields, 'key');
+  if (findJiraKey(value) !== value) throw new BridgeError('malformed', `key ${JSON.stringify(value)} is not a Jira work item key`);
+  return value as JiraKey;
 }
 
 function integer(fields: Record<string, unknown>, name: string): number {

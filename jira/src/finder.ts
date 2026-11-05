@@ -37,10 +37,15 @@ export async function findDecisions(
   release: Release,
   options: { llm: boolean; implicit: ImplicitFinder },
 ): Promise<Decision[]> {
-  const explicit = release.items.filter(isLabelled).map(explicitDecision);
+  const explicit = labelledDecisions(release.items);
   if (!options.llm) return explicit;
   const implicit = (await options.implicit.find(release)).flatMap((found) => checked(release, found));
   return [...explicit, ...implicit];
+}
+
+// The decisions code finds on its own, with no LLM: one per item labelled needs-decision
+export function labelledDecisions(items: readonly WorkItem[]): Decision[] {
+  return items.filter(isLabelled).map(explicitDecision);
 }
 
 function isLabelled(item: WorkItem): boolean {

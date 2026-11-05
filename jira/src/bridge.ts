@@ -2,8 +2,10 @@ import api, { route } from '@forge/api';
 import { paragraphs } from '@shipmill-atlassian/shared/adf';
 import { BridgeError, SIGNATURE_HEADER, decode, type PullRequestOpened } from '@shipmill-atlassian/shared/bridge';
 import { findJiraKey } from '@shipmill-atlassian/shared/jira-key';
-import { rememberLinkedPullRequest } from './pull-request-store';
+import { forgeIssueRest, forgeJiraRest } from './jira-rest';
+import { kvsPullRequests, rememberLinkedPullRequest } from './pull-request-store';
 import { bridgeSecret } from './settings';
+import { workItemStatus } from './work-item';
 
 // The web trigger the Bitbucket app calls with signed messages (see shared/src/bridge.ts)
 
@@ -32,6 +34,8 @@ export async function onBridgeRequest(request: WebTriggerRequest): Promise<WebTr
       return respond(200, { paired: true });
     case 'pullrequest-opened':
       return respond(200, await pullRequestOpened(message));
+    case 'work-item':
+      return respond(200, await workItemStatus(forgeJiraRest, forgeIssueRest, kvsPullRequests, message.key));
   }
 }
 

@@ -9,6 +9,7 @@
     "./adf": "./src/adf.ts",
     "./parse": "./src/parse.ts",
     "./release": "./src/release.ts",
-    "./pull-requests": "./src/pull-requests.ts"
+    "./pull-requests": "./src/pull-requests.ts",
+    "./work-item": "./src/work-item.ts"
   }
 }
