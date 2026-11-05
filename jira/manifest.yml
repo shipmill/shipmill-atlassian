@@ -11,6 +11,14 @@ modules:
       function: on-bridge-request
       response:
         type: dynamic
+    - key: dev
+      function: on-dev-request
+      response:
+        type: dynamic
+  consumer:
+    - key: eval-consumer
+      queue: eval-cases
+      function: on-eval-case
   llm:
     - key: decisions-llm
       model:
@@ -20,6 +28,11 @@ modules:
       handler: index.onBridgeRequest
     - key: settings-resolver
       handler: index.settingsResolver
+    - key: on-dev-request
+      handler: index.onDevRequest
+    - key: on-eval-case
+      handler: index.onEvalCase
+      timeoutSeconds: 300
 resources:
   - key: admin
     path: src/frontend/admin.tsx

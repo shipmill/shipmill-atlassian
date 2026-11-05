@@ -1,0 +1,113 @@
+{
+  "id": "label-without-question",
+  "about": "A labelled item with no question written anywhere is still a decision",
+  "release": {
+    "project": "APP",
+    "version": "3.1",
+    "items": [
+      {
+        "key": "APP-1",
+        "summary": "Rename the Teams plan to Business",
+        "description": "",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [
+          "needs-decision"
+        ],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-2",
+        "summary": "Fix typo on the login page",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-3",
+        "summary": "Upgrade the logging library",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-4",
+        "summary": "Add a health check endpoint",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-5",
+        "summary": "Tidy the settings form",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      }
+    ]
+  },
+  "expected": [
+    {
+      "key": "APP-1",
+      "source": "label"
+    }
+  ]
+}

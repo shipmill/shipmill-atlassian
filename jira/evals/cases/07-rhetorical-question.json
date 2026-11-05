@@ -1,0 +1,125 @@
+{
+  "id": "rhetorical-question",
+  "about": "A rhetorical question and a thank-you are no decisions",
+  "release": {
+    "project": "APP",
+    "version": "3.1",
+    "items": [
+      {
+        "key": "APP-1",
+        "summary": "Fix the flaky checkout test",
+        "description": "",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [
+          {
+            "id": "30010",
+            "author": {
+              "accountId": "712020:cho",
+              "displayName": "Cho Min"
+            },
+            "created": "2026-11-04T10:01:00.000+0000",
+            "text": "Who knew a time zone could break a test three times in one week?"
+          },
+          {
+            "id": "30011",
+            "author": {
+              "accountId": "712020:ben",
+              "displayName": "Ben Moore"
+            },
+            "created": "2026-11-04T10:02:00.000+0000",
+            "text": "Thanks for chasing this down!"
+          }
+        ],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-2",
+        "summary": "Fix typo on the login page",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-3",
+        "summary": "Upgrade the logging library",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-4",
+        "summary": "Add a health check endpoint",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-5",
+        "summary": "Tidy the settings form",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      }
+    ]
+  },
+  "expected": []
+}

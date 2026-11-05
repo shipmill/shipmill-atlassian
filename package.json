@@ -5,9 +5,10 @@
   "type": "module",
   "workspaces": ["shared", "jira", "bitbucket", "seed"],
   "scripts": {
-    "typecheck": "tsc --noEmit -p shared && tsc --noEmit -p jira && tsc --noEmit -p bitbucket && tsc --noEmit -p seed",
+    "typecheck": "tsc --noEmit -p shared && tsc --noEmit -p jira && tsc --noEmit -p jira/evals && tsc --noEmit -p bitbucket && tsc --noEmit -p seed",
     "test": "node --import tsx --test 'shared/src/**/*.test.ts' 'jira/src/**/*.test.ts' 'bitbucket/src/**/*.test.ts' 'seed/src/**/*.test.ts'",
     "lint": "npm run lint --workspace jira && npm run lint --workspace bitbucket",
+    "evals": "node --import tsx jira/evals/run.ts",
     "seed": "npm run seed --workspace seed --"
   },
   "devDependencies": {

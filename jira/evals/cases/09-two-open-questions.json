@@ -1,0 +1,154 @@
+{
+  "id": "two-open-questions",
+  "about": "Two unanswered choices on two items are two decisions",
+  "release": {
+    "project": "APP",
+    "version": "3.1",
+    "items": [
+      {
+        "key": "APP-1",
+        "summary": "Drop support for Safari 15",
+        "description": "",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [
+          {
+            "id": "30014",
+            "author": {
+              "accountId": "712020:cho",
+              "displayName": "Cho Min"
+            },
+            "created": "2026-11-04T10:01:00.000+0000",
+            "text": "Do we drop Safari 15 in 3.1 or wait for 3.2? About 2% of sessions still use it."
+          }
+        ],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-2",
+        "summary": "Free trial length",
+        "description": "",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:cho",
+          "displayName": "Cho Min"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [
+          {
+            "id": "30015",
+            "author": {
+              "accountId": "712020:ana",
+              "displayName": "Ana Silva"
+            },
+            "created": "2026-11-04T10:02:00.000+0000",
+            "text": "Is the trial 14 days or 30 days from 3.1 on? Marketing has copy for both."
+          }
+        ],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-3",
+        "summary": "Fix typo on the login page",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-4",
+        "summary": "Upgrade the logging library",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-5",
+        "summary": "Add a health check endpoint",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-6",
+        "summary": "Tidy the settings form",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      }
+    ]
+  },
+  "expected": [
+    {
+      "key": "APP-1",
+      "source": "llm"
+    },
+    {
+      "key": "APP-2",
+      "source": "llm"
+    }
+  ]
+}

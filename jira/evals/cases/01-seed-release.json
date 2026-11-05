@@ -1,0 +1,451 @@
+{
+  "id": "seed-release",
+  "about": "The seed's release 2.4 (issue #1): two labelled decisions and one question in a comment nobody answered",
+  "release": {
+    "project": "HRB",
+    "version": "2.4",
+    "items": [
+      {
+        "key": "HRB-1",
+        "summary": "Export invoices as CSV",
+        "description": "Accountants want the filtered invoice list as a CSV file.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:lee",
+          "displayName": "Lee Park"
+        },
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": [
+          {
+            "workspace": "shipmill-dev",
+            "repository": "harbor",
+            "id": 1,
+            "title": "HRB-1 Adds a CSV export to the invoice list",
+            "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/1"
+          }
+        ]
+      },
+      {
+        "key": "HRB-2",
+        "summary": "Retire API v1 tokens",
+        "description": "Decision needed: retire v1 tokens in 2.4, or keep them for one more release? Fourteen customers still call the API with a v1 token every week.",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [
+          "needs-decision"
+        ],
+        "owner": {
+          "accountId": "712020:dana",
+          "displayName": "Dana Okafor"
+        },
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": [
+          {
+            "workspace": "shipmill-dev",
+            "repository": "harbor",
+            "id": 2,
+            "title": "HRB-2 Rejects API v1 tokens with a pointer to the migration guide",
+            "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/2"
+          }
+        ]
+      },
+      {
+        "key": "HRB-3",
+        "summary": "Roll out the new pricing page",
+        "description": "Decision needed: show the new prices to every account in 2.4, or to new sign-ups only? Existing accounts keep their plan either way.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [
+          "needs-decision"
+        ],
+        "owner": {
+          "accountId": "712020:dana",
+          "displayName": "Dana Okafor"
+        },
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": [
+          {
+            "workspace": "shipmill-dev",
+            "repository": "harbor",
+            "id": 3,
+            "title": "HRB-3 Serves the new pricing page behind the new-pricing flag",
+            "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/3"
+          }
+        ]
+      },
+      {
+        "key": "HRB-4",
+        "summary": "Migrate the invoices table to the new schema",
+        "description": "Moves line items into their own table so totals stop drifting.",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:lee",
+          "displayName": "Lee Park"
+        },
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [
+          {
+            "id": "10101",
+            "author": {
+              "accountId": "557058:seed-bot",
+              "displayName": "Seed Bot"
+            },
+            "created": "2026-11-03T09:04:00.000+0000",
+            "text": "Do we run this migration during the 2.4 rollout or in a separate maintenance window? It locks the invoices table for about 20 minutes."
+          }
+        ],
+        "links": [
+          {
+            "relation": "blocks",
+            "key": "HRB-12",
+            "summary": "Archive invoices in bulk",
+            "statusCategory": "new"
+          }
+        ],
+        "pullRequests": [
+          {
+            "workspace": "shipmill-dev",
+            "repository": "harbor",
+            "id": 4,
+            "title": "HRB-4 Adds the migration that splits line items out of invoices",
+            "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/4"
+          }
+        ]
+      },
+      {
+        "key": "HRB-5",
+        "summary": "Retry failed webhooks with backoff",
+        "description": "Retry a failed webhook up to five times over an hour.",
+        "status": "In Review",
+        "statusCategory": "indeterminate",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:lee",
+          "displayName": "Lee Park"
+        },
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": [
+          {
+            "workspace": "shipmill-dev",
+            "repository": "harbor",
+            "id": 5,
+            "title": "HRB-5 Retries failed webhooks with exponential backoff",
+            "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/5"
+          }
+        ]
+      },
+      {
+        "key": "HRB-6",
+        "summary": "Invoice PDFs show the wrong due date across time zones",
+        "description": "A customer in UTC-8 sees a due date one day earlier than the web app.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": [
+          {
+            "workspace": "shipmill-dev",
+            "repository": "harbor",
+            "id": 6,
+            "title": "HRB-6 Renders PDF due dates in the account time zone",
+            "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/6"
+          }
+        ]
+      },
+      {
+        "key": "HRB-7",
+        "summary": "Customer search times out above 50k records",
+        "description": "The search query scans every customer; it needs the name index.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": [
+          {
+            "workspace": "shipmill-dev",
+            "repository": "harbor",
+            "id": 7,
+            "title": "HRB-7 Uses the name index for customer search",
+            "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/7"
+          }
+        ]
+      },
+      {
+        "key": "HRB-8",
+        "summary": "Upgrade the runtime to Node 24",
+        "description": "Node 20 leaves maintenance before the next release.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": [
+          {
+            "workspace": "shipmill-dev",
+            "repository": "harbor",
+            "id": 8,
+            "title": "HRB-8 Moves the runtime and CI to Node 24",
+            "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/8"
+          }
+        ]
+      },
+      {
+        "key": "HRB-9",
+        "summary": "Sign in with Okta SSO",
+        "description": "Workspaces on the Business plan can require Okta sign-in.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "HRB-10",
+        "summary": "Dark mode for the dashboard",
+        "description": "Follow the system setting, with a manual switch in the profile menu.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "HRB-11",
+        "summary": "Audit log for role changes",
+        "description": "Record who changed whose role, and when.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "HRB-12",
+        "summary": "Archive invoices in bulk",
+        "description": "Select many paid invoices and archive them in one step.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [
+          {
+            "relation": "is blocked by",
+            "key": "HRB-4",
+            "summary": "Migrate the invoices table to the new schema",
+            "statusCategory": "indeterminate"
+          }
+        ],
+        "pullRequests": []
+      },
+      {
+        "key": "HRB-13",
+        "summary": "Payment reminder emails",
+        "description": "Remind the customer three days before and on the due date.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "HRB-14",
+        "summary": "Rounding error on JPY totals",
+        "description": "Totals in a currency without minor units show a fraction.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "HRB-15",
+        "summary": "Return rate limit headers on every API response",
+        "description": "Clients cannot see their remaining quota today.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "HRB-16",
+        "summary": "Onboarding checklist for new workspaces",
+        "description": "Five steps from sign-up to the first invoice sent.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "HRB-17",
+        "summary": "Invoice editor overflows on small screens",
+        "description": "The line item table scrolls off the page below 400 px.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "HRB-18",
+        "summary": "Update the Stripe SDK to the current major version",
+        "description": "The pinned major version stops receiving fixes this quarter.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "HRB-19",
+        "summary": "Document the v2 API pagination",
+        "description": "Cursor pagination is live but undocumented.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "HRB-20",
+        "summary": "CSV import reports the wrong row on errors",
+        "description": "The row number skips the header, so it is off by one.",
+        "status": "To Do",
+        "statusCategory": "new",
+        "labels": [],
+        "owner": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      }
+    ]
+  },
+  "expected": [
+    {
+      "key": "HRB-2",
+      "source": "label"
+    },
+    {
+      "key": "HRB-3",
+      "source": "label"
+    },
+    {
+      "key": "HRB-4",
+      "source": "llm"
+    }
+  ]
+}

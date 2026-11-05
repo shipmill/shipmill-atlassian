@@ -1,0 +1,306 @@
+{
+  "id": "noisy-but-settled",
+  "about": "Many answered questions across a release add up to no decisions",
+  "release": {
+    "project": "APP",
+    "version": "3.1",
+    "items": [
+      {
+        "key": "APP-1",
+        "summary": "Faster search",
+        "description": "Use the trigram index.",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [
+          {
+            "id": "30023",
+            "author": {
+              "accountId": "712020:ben",
+              "displayName": "Ben Moore"
+            },
+            "created": "2026-11-04T10:01:00.000+0000",
+            "text": "Is the index built on staging yet?"
+          },
+          {
+            "id": "30024",
+            "author": {
+              "accountId": "712020:cho",
+              "displayName": "Cho Min"
+            },
+            "created": "2026-11-04T10:02:00.000+0000",
+            "text": "Yes, since Monday."
+          }
+        ],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-2",
+        "summary": "Webhook signing",
+        "description": "Sign payloads with HMAC-SHA256.",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [
+          {
+            "id": "30025",
+            "author": {
+              "accountId": "712020:ana",
+              "displayName": "Ana Silva"
+            },
+            "created": "2026-11-04T10:01:00.000+0000",
+            "text": "Which header name do other providers use?"
+          },
+          {
+            "id": "30026",
+            "author": {
+              "accountId": "712020:ben",
+              "displayName": "Ben Moore"
+            },
+            "created": "2026-11-04T10:02:00.000+0000",
+            "text": "Most use X-Signature; we go with X-App-Signature as agreed."
+          }
+        ],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-3",
+        "summary": "Audit log export",
+        "description": "Export the audit log as CSV.",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [
+          {
+            "id": "30027",
+            "author": {
+              "accountId": "712020:cho",
+              "displayName": "Cho Min"
+            },
+            "created": "2026-11-04T10:03:00.000+0000",
+            "text": "Done and deployed to staging."
+          }
+        ],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-4",
+        "summary": "Dark mode",
+        "description": "Follow the system setting.",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [
+          {
+            "id": "30028",
+            "author": {
+              "accountId": "712020:ben",
+              "displayName": "Ben Moore"
+            },
+            "created": "2026-11-04T10:01:00.000+0000",
+            "text": "Should the toggle live in the profile menu or settings?"
+          },
+          {
+            "id": "30029",
+            "author": {
+              "accountId": "712020:ana",
+              "displayName": "Ana Silva"
+            },
+            "created": "2026-11-04T10:02:00.000+0000",
+            "text": "Profile menu, like the mockup."
+          }
+        ],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-5",
+        "summary": "Password rules",
+        "description": "Require 12 characters.",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [
+          {
+            "id": "30030",
+            "author": {
+              "accountId": "712020:ana",
+              "displayName": "Ana Silva"
+            },
+            "created": "2026-11-04T10:01:00.000+0000",
+            "text": "Can someone review the PR?"
+          },
+          {
+            "id": "30031",
+            "author": {
+              "accountId": "712020:cho",
+              "displayName": "Cho Min"
+            },
+            "created": "2026-11-04T10:02:00.000+0000",
+            "text": "Reviewed and approved."
+          }
+        ],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-6",
+        "summary": "Fix typo on the login page",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-7",
+        "summary": "Upgrade the logging library",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-8",
+        "summary": "Add a health check endpoint",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-9",
+        "summary": "Tidy the settings form",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-10",
+        "summary": "Cache the country list",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-11",
+        "summary": "Speed up the dashboard query",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      }
+    ]
+  },
+  "expected": []
+}

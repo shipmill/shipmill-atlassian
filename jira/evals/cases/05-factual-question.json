@@ -1,0 +1,125 @@
+{
+  "id": "factual-question",
+  "about": "A question about facts that someone answers is no decision",
+  "release": {
+    "project": "APP",
+    "version": "3.1",
+    "items": [
+      {
+        "key": "APP-1",
+        "summary": "Raise the upload limit to 50 MB",
+        "description": "",
+        "status": "In Progress",
+        "statusCategory": "indeterminate",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [
+          {
+            "id": "30005",
+            "author": {
+              "accountId": "712020:ben",
+              "displayName": "Ben Moore"
+            },
+            "created": "2026-11-04T10:01:00.000+0000",
+            "text": "Which nginx setting caps the body size today?"
+          },
+          {
+            "id": "30006",
+            "author": {
+              "accountId": "712020:ana",
+              "displayName": "Ana Silva"
+            },
+            "created": "2026-11-04T10:02:00.000+0000",
+            "text": "client_max_body_size, it is 20m in the ingress config."
+          }
+        ],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-2",
+        "summary": "Fix typo on the login page",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-3",
+        "summary": "Upgrade the logging library",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-4",
+        "summary": "Add a health check endpoint",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      },
+      {
+        "key": "APP-5",
+        "summary": "Tidy the settings form",
+        "description": "Routine change.",
+        "status": "Done",
+        "statusCategory": "done",
+        "labels": [],
+        "owner": {
+          "accountId": "712020:ana",
+          "displayName": "Ana Silva"
+        },
+        "reporter": {
+          "accountId": "712020:ben",
+          "displayName": "Ben Moore"
+        },
+        "comments": [],
+        "links": [],
+        "pullRequests": []
+      }
+    ]
+  },
+  "expected": []
+}
