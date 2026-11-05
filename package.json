@@ -5,7 +5,7 @@
   "type": "module",
   "workspaces": ["shared", "jira", "bitbucket"],
   "scripts": {
-    "typecheck": "tsc -p shared && tsc -p jira && tsc -p bitbucket",
+    "typecheck": "tsc --noEmit -p shared && tsc --noEmit -p jira && tsc --noEmit -p bitbucket",
     "test": "node --import tsx --test 'shared/src/**/*.test.ts' 'jira/src/**/*.test.ts' 'bitbucket/src/**/*.test.ts'",
     "lint": "npm run lint --workspace jira && npm run lint --workspace bitbucket"
   },
