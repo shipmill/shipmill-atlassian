@@ -34,3 +34,4 @@ app:
     name: nodejs24.x
     memoryMB: 256
     architecture: arm64
+  id: ari:cloud:ecosystem::app/94c75365-4039-4bb4-98af-2c8287191017
