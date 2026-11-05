@@ -42,18 +42,16 @@ export function encode(secret: string, message: BridgeMessage): { body: string; 
 }
 
 export function decode(secret: string, body: string, signature: string, now: number): BridgeMessage {
+  return parse(verify(secret, body, signature, now));
+}
+
+// Checks a signed body of any shape (the bridge's messages, the development trigger's
+// requests): the signature first, then that it is a JSON object sent within MAX_SKEW_MS
+export function verify(secret: string, body: string, signature: string, now: number): Record<string, unknown> {
   const expected = sign(secret, body);
   if (signature.length !== expected.length || !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
     throw new BridgeError('bad-signature', 'the signature does not match the shared secret');
   }
-  const message = parse(body);
-  if (Math.abs(now - message.sentAt) > MAX_SKEW_MS) {
-    throw new BridgeError('stale', `sent ${now - message.sentAt} ms ago, more than ${MAX_SKEW_MS} ms`);
-  }
-  return message;
-}
-
-function parse(body: string): BridgeMessage {
   let raw: unknown;
   try {
     raw = JSON.parse(body);
@@ -61,8 +59,16 @@ function parse(body: string): BridgeMessage {
     if (error instanceof SyntaxError) throw new BridgeError('malformed', `not JSON: ${error.message}`);
     throw error;
   }
-  if (typeof raw !== 'object' || raw === null) throw new BridgeError('malformed', 'not an object');
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new BridgeError('malformed', 'not an object');
   const fields = raw as Record<string, unknown>;
+  const sentAt = integer(fields, 'sentAt');
+  if (Math.abs(now - sentAt) > MAX_SKEW_MS) {
+    throw new BridgeError('stale', `sent ${now - sentAt} ms ago, more than ${MAX_SKEW_MS} ms`);
+  }
+  return fields;
+}
+
+function parse(fields: Record<string, unknown>): BridgeMessage {
   const sentAt = integer(fields, 'sentAt');
   switch (fields.kind) {
     case 'ping':

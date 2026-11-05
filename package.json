@@ -3,11 +3,16 @@
   "private": true,
   "license": "MIT",
   "type": "module",
-  "workspaces": ["shared", "jira", "bitbucket"],
+  "workspaces": [
+    "shared",
+    "jira",
+    "bitbucket"
+  ],
   "scripts": {
-    "typecheck": "tsc --noEmit -p shared && tsc --noEmit -p jira && tsc --noEmit -p bitbucket",
+    "typecheck": "tsc --noEmit -p shared && tsc --noEmit -p jira && tsc --noEmit -p jira/evals && tsc --noEmit -p bitbucket",
     "test": "node --import tsx --test 'shared/src/**/*.test.ts' 'jira/src/**/*.test.ts' 'bitbucket/src/**/*.test.ts'",
-    "lint": "npm run lint --workspace jira && npm run lint --workspace bitbucket"
+    "lint": "npm run lint --workspace jira && npm run lint --workspace bitbucket",
+    "evals": "node --import tsx jira/evals/run.ts"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",

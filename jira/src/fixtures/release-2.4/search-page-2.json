@@ -1,0 +1,333 @@
+{
+  "issues": [
+    {
+      "id": "10013",
+      "key": "HRB-13",
+      "fields": {
+        "summary": "Payment reminder emails",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Remind the customer three days before and on the due date."
+                }
+              ]
+            }
+          ]
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new"
+          }
+        },
+        "labels": [],
+        "assignee": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "issuelinks": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "total": 0,
+          "startAt": 0
+        }
+      }
+    },
+    {
+      "id": "10014",
+      "key": "HRB-14",
+      "fields": {
+        "summary": "Rounding error on JPY totals",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Totals in a currency without minor units show a fraction."
+                }
+              ]
+            }
+          ]
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new"
+          }
+        },
+        "labels": [],
+        "assignee": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "issuelinks": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "total": 0,
+          "startAt": 0
+        }
+      }
+    },
+    {
+      "id": "10015",
+      "key": "HRB-15",
+      "fields": {
+        "summary": "Return rate limit headers on every API response",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Clients cannot see their remaining quota today."
+                }
+              ]
+            }
+          ]
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new"
+          }
+        },
+        "labels": [],
+        "assignee": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "issuelinks": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "total": 0,
+          "startAt": 0
+        }
+      }
+    },
+    {
+      "id": "10016",
+      "key": "HRB-16",
+      "fields": {
+        "summary": "Onboarding checklist for new workspaces",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Five steps from sign-up to the first invoice sent."
+                }
+              ]
+            }
+          ]
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new"
+          }
+        },
+        "labels": [],
+        "assignee": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "issuelinks": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "total": 0,
+          "startAt": 0
+        }
+      }
+    },
+    {
+      "id": "10017",
+      "key": "HRB-17",
+      "fields": {
+        "summary": "Invoice editor overflows on small screens",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The line item table scrolls off the page below 400 px."
+                }
+              ]
+            }
+          ]
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new"
+          }
+        },
+        "labels": [],
+        "assignee": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "issuelinks": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "total": 0,
+          "startAt": 0
+        }
+      }
+    },
+    {
+      "id": "10018",
+      "key": "HRB-18",
+      "fields": {
+        "summary": "Update the Stripe SDK to the current major version",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The pinned major version stops receiving fixes this quarter."
+                }
+              ]
+            }
+          ]
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new"
+          }
+        },
+        "labels": [],
+        "assignee": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "issuelinks": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "total": 0,
+          "startAt": 0
+        }
+      }
+    },
+    {
+      "id": "10019",
+      "key": "HRB-19",
+      "fields": {
+        "summary": "Document the v2 API pagination",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Cursor pagination is live but undocumented."
+                }
+              ]
+            }
+          ]
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new"
+          }
+        },
+        "labels": [],
+        "assignee": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "issuelinks": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "total": 0,
+          "startAt": 0
+        }
+      }
+    },
+    {
+      "id": "10020",
+      "key": "HRB-20",
+      "fields": {
+        "summary": "CSV import reports the wrong row on errors",
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The row number skips the header, so it is off by one."
+                }
+              ]
+            }
+          ]
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new"
+          }
+        },
+        "labels": [],
+        "assignee": null,
+        "reporter": {
+          "accountId": "557058:seed-bot",
+          "displayName": "Seed Bot"
+        },
+        "issuelinks": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "total": 0,
+          "startAt": 0
+        }
+      }
+    }
+  ],
+  "isLast": true
+}
