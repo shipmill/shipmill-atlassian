@@ -15,10 +15,23 @@ modules:
       function: on-dev-request
       response:
         type: dynamic
+  trigger:
+    - key: comment-trigger
+      function: on-comment
+      events:
+        - avi:jira:commented:issue
+      filter:
+        ignoreSelf: true
   consumer:
     - key: eval-consumer
       queue: eval-cases
       function: on-eval-case
+    - key: relay-consumer
+      queue: relay-replies
+      function: on-relay-reply
+    - key: prepare-consumer
+      queue: prepare-releases
+      function: on-prepare-release
   llm:
     - key: decisions-llm
       model:
@@ -33,6 +46,14 @@ modules:
     - key: on-eval-case
       handler: index.onEvalCase
       timeoutSeconds: 300
+    - key: on-comment
+      handler: index.onComment
+    - key: on-relay-reply
+      handler: index.onRelayReply
+      timeoutSeconds: 120
+    - key: on-prepare-release
+      handler: index.onPrepareRelease
+      timeoutSeconds: 600
 resources:
   - key: admin
     path: src/frontend/admin.tsx

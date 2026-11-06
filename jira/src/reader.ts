@@ -91,20 +91,20 @@ function person(value: unknown, path: string): Person | null {
 // The search embeds the first comments only; past them the reader pages through the item's comments
 async function comments(rest: JiraRest, key: JiraKey, embedded: Fields, path: string): Promise<Comment[]> {
   const total = natural(embedded.total, `${path}.total`);
-  const first = list(embedded.comments, `${path}.comments`, comment);
+  const first = list(embedded.comments, `${path}.comments`, jiraComment);
   if (first.length === total) return first;
   const all: Comment[] = [];
   while (all.length < total) {
     const at = `comments(${key}, ${all.length})`;
     const page = object(await rest.comments(key, all.length, COMMENT_PAGE), at);
-    const entries = list(page.comments, `${at}.comments`, comment);
+    const entries = list(page.comments, `${at}.comments`, jiraComment);
     if (entries.length === 0) throw new Error(`${at}: Jira reported ${total} comments but returned none past ${all.length}`);
     all.push(...entries);
   }
   return all;
 }
 
-function comment(value: unknown, path: string): Comment {
+export function jiraComment(value: unknown, path: string): Comment {
   const fields = object(value, path);
   return {
     id: commentId(nonEmpty(fields.id, `${path}.id`)),
