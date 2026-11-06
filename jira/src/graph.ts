@@ -164,7 +164,63 @@ export type ConsumerContext = { installContext: string; principal?: { accountId:
 
 // The Teamwork Graph answers only as a user (Forge has no asApp() for it). A prepare pushed
 // by the dev trigger runs for nobody, so it prepares from Jira REST alone and says so.
-export function preparerGraph(context: ConsumerContext): WorkItemGraph {
+// The graph the panel carried in the event comes first; without it (the dev trigger), the
+// consumer's own user, where there is one.
+export function preparerGraph(context: ConsumerContext, carried?: GraphLookups): WorkItemGraph {
+  if (carried !== undefined) return carriedGraph(carried);
   if (context.principal === undefined) return unavailableGraph('the prepare runs for no user, and the Teamwork Graph answers only as one');
   return siteGraph(forgeUserGraph, forgeIssueRest, siteCloudId(context.installContext));
+}
+
+// The graph a prepare carries in its queue event. The release panel's resolver runs as the
+// user who pressed "Ask decisions", so it reads the graph there and passes what it read to
+// the prepare consumer, which may run for no user. Keyed by work item, as JSON.
+export type GraphLookups = Record<string, GraphLookup>;
+
+const GRAPH_LISTS = Object.keys(QUERY_SCOPES) as GraphList[];
+
+export function parseGraphLookups(value: unknown, path: string): GraphLookups {
+  const fields = object(value, path);
+  return Object.fromEntries(Object.entries(fields).map(([key, lookup]) => [key, parseGraphLookup(lookup, `${path}.${key}`)]));
+}
+
+function parseGraphLookup(value: unknown, path: string): GraphLookup {
+  const fields = object(value, path);
+  const status = oneOf(fields.status, `${path}.status`, ['read', 'unavailable'] as const);
+  if (status === 'unavailable') return { status, reason: nonEmpty(fields.reason, `${path}.reason`) };
+  const evidence = object(fields.evidence, `${path}.evidence`);
+  const entries = (list: GraphList): Record<string, unknown>[] =>
+    array(evidence[list], `${path}.evidence.${list}`).map((entry, index) => object(entry, `${path}.evidence.${list}[${index}]`));
+  return {
+    status,
+    evidence: {
+      pullRequests: entries('pullRequests').map((entry, index) => {
+        const at = `${path}.evidence.pullRequests[${index}]`;
+        return { title: nonEmpty(entry.title, `${at}.title`), url: nonEmpty(entry.url, `${at}.url`), status: oneOf(entry.status, `${at}.status`, PULL_REQUEST_STATUSES) };
+      }),
+      deployments: entries('deployments').map((entry, index) => {
+        const at = `${path}.evidence.deployments[${index}]`;
+        return {
+          name: nonEmpty(entry.name, `${at}.name`),
+          environment: nonEmpty(entry.environment, `${at}.environment`),
+          url: nonEmpty(entry.url, `${at}.url`),
+          state: oneOf(entry.state, `${at}.state`, DEPLOYMENT_STATES),
+        };
+      }),
+      teams: entries('teams').map((entry, index) => {
+        const at = `${path}.evidence.teams[${index}]`;
+        return { name: nonEmpty(entry.name, `${at}.name`), url: string(entry.url, `${at}.url`) };
+      }),
+    },
+    empty: array(fields.empty, `${path}.empty`).map((list, index) => oneOf(list, `${path}.empty[${index}]`, GRAPH_LISTS)),
+  };
+}
+
+// What the resolver read, for the consumer. An item it did not read (it was already asked
+// when the button was pressed) prepares from Jira REST alone, and the log says so.
+export function carriedGraph(lookups: GraphLookups): WorkItemGraph {
+  return {
+    lookup: async (key) =>
+      lookups[key] ?? { status: 'unavailable', reason: 'the panel did not read the graph for it, since it was already asked when the button was pressed' },
+  };
 }

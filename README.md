@@ -161,9 +161,10 @@ a reply Claude reads as no decision yet (a question back, "let me check") keeps 
 without a note. A question asked with the LLM off is answered by number even if the switch
 is turned on later.
 
-In development the `dev` web trigger starts it: a signed
-`{"action":"prepare","project":"HRB","version":"2.4","llm":false}` asks the release's
-decisions, and `{"action":"decision","key":"HRB-2"}` shows what the item waits on.
+The release panel's Ask decisions button starts it for the picked fix version (see
+[The release panel](#the-release-panel)). In development the `dev` web trigger can start it
+too: a signed `{"action":"prepare","project":"HRB","version":"2.4","llm":false}` asks the
+release's decisions, and `{"action":"decision","key":"HRB-2"}` shows what the item waits on.
 
 ## Decisions on pull requests
 
@@ -210,7 +211,10 @@ Evidence: asked in the description of HRB-2: "..."; in the Teamwork Graph, pull 
 ```
 
 Jira REST stays the source of everything else, so without the graph the comment is exactly
-as above. The graph answers only as a user: a prepare that runs for nobody, such as one the
+as above. The graph answers only as a user, so the release panel's Ask decisions button reads
+it: its resolver runs as the person who pressed it, reads the graph for each item the prepare
+may ask, and passes what it read to the prepare in the queue event, since the prepare runs in
+a consumer that has no user to read it as. A prepare that runs for nobody, such as one the
 `dev` web trigger starts, reads Jira alone and logs that it did.
 
 The Jira app asks for four read-only graph scopes, only the object types its queries cross:
@@ -238,6 +242,12 @@ it, so the panel makes no LLM call. An item labelled but not asked yet shows the
 finder read and the person shipmill will ask, after the asked ones. Below them come the
 decisions opened on pull requests (see the next section), each with its pull request and who
 it waits on. With nothing left in either list, the panel shows Ready to ship.
+
+Ask decisions asks the picked version's open decisions in the background, each in a question
+comment as above, and Refresh then shows them asked. It reads the Teamwork Graph as the
+person who pressed it, for the labelled items (every item while the LLM switch is on, since
+Claude may find a decision on any of them). An item that already waits on an answer is not
+asked again, and its graph is not read.
 
 ## A pull request's decision blocks the release
 
