@@ -1,4 +1,6 @@
 import type { JiraKey } from '@shipmill-atlassian/shared/jira-key';
+import type { PullRequestReport } from '@shipmill-atlassian/shared/pull-request-decisions';
+import type { LinkedPullRequest } from '@shipmill-atlassian/shared/pull-requests';
 import { NEEDS_DECISION, type CommentId, type Person, type Release, type WorkItem } from '@shipmill-atlassian/shared/release';
 
 // The decision finder. Explicit decisions are the work items labelled needs-decision, found
@@ -41,6 +43,40 @@ export async function findDecisions(
   if (!options.llm) return explicit;
   const implicit = (await options.implicit.find(release)).flatMap((found) => checked(release, found));
   return [...explicit, ...implicit];
+}
+
+// A decision opened on a Bitbucket pull request of a work item in the release: an unresolved
+// "Decision needed:" task there. It blocks the release like a decision on the item, but it
+// is asked and answered on the pull request, so the preparer never asks it in Jira.
+export type PullRequestDecision = {
+  key: JiraKey;
+  question: string;
+  pullRequest: LinkedPullRequest;
+  taskId: number;
+  askOf: Person | null;
+};
+
+// The reported pull request decisions of the release's work items, in item order. A report
+// for an item outside the release is another release's.
+export function pullRequestDecisions(items: readonly WorkItem[], reports: readonly PullRequestReport[]): PullRequestDecision[] {
+  return items.flatMap((item) =>
+    reports
+      .filter((report) => report.key === item.key)
+      .flatMap((report) =>
+        report.open.map((task) => ({
+          key: item.key,
+          question: oneLine(task.question),
+          pullRequest: report.pullRequest,
+          taskId: task.taskId,
+          askOf: item.owner ?? item.reporter,
+        })),
+      ),
+  );
+}
+
+// A release is ready once nothing blocks it: no decision on its work items or their pull requests
+export function releaseReady(decisions: readonly Decision[], onPullRequests: readonly PullRequestDecision[]): boolean {
+  return decisions.length === 0 && onPullRequests.length === 0;
 }
 
 // The decisions code finds on its own, with no LLM: one per item labelled needs-decision

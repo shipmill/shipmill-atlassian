@@ -6,6 +6,13 @@ modules:
       resolver:
         function: settings-resolver
       render: native
+  jira:projectPage:
+    - key: release-panel
+      title: Release decisions
+      resource: release
+      resolver:
+        function: panel-resolver
+      render: native
   webtrigger:
     - key: bridge
       function: on-bridge-request
@@ -41,6 +48,8 @@ modules:
       handler: index.onBridgeRequest
     - key: settings-resolver
       handler: index.settingsResolver
+    - key: panel-resolver
+      handler: index.panelResolver
     - key: on-dev-request
       handler: index.onDevRequest
     - key: on-eval-case
@@ -57,6 +66,8 @@ modules:
 resources:
   - key: admin
     path: src/frontend/admin.tsx
+  - key: release
+    path: src/frontend/release.tsx
 permissions:
   scopes:
     - read:jira-work

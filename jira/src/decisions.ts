@@ -1,15 +1,16 @@
 import { chat } from '@forge/llm';
 import type { ProjectKey } from '@shipmill-atlassian/shared/jira-key';
 import type { Release } from '@shipmill-atlassian/shared/release';
-import { findDecisions, type Decision } from './finder';
+import { findDecisions, pullRequestDecisions, releaseReady, type Decision, type PullRequestDecision } from './finder';
 import { forgeJiraRest } from './jira-rest';
 import { llmFinder } from './llm-finder';
+import { kvsReports, reportsFor } from './pull-request-report';
 import { kvsPullRequests } from './pull-request-store';
 import { readRelease } from './reader';
 import { llmEnabled } from './settings';
 
-// The reader and the finder wired to Forge: Jira REST, the bridge's pull requests in KVS,
-// Forge LLM, and the site's LLM switch. With the LLM on this can run past the 25 s a
+// The reader and the finder wired to Forge: Jira REST, the bridge's pull requests and the
+// decisions reported open on them in KVS, Forge LLM, and the site's LLM switch. With the LLM on this can run past the 25 s a
 // resolver or product trigger has, so call it from an async event consumer.
 
 export const forgeImplicitFinder = llmFinder(chat);
@@ -19,8 +20,10 @@ export async function releaseDecisions(
   project: ProjectKey,
   version: string,
   llm?: boolean,
-): Promise<{ release: Release; decisions: Decision[] }> {
+): Promise<{ release: Release; decisions: Decision[]; pullRequestDecisions: PullRequestDecision[]; ready: boolean }> {
   const release = await readRelease(forgeJiraRest, kvsPullRequests, project, version);
   const decisions = await findDecisions(release, { llm: llm ?? (await llmEnabled()), implicit: forgeImplicitFinder });
-  return { release, decisions };
+  const keys = new Set(release.items.map((item) => item.key));
+  const onPullRequests = pullRequestDecisions(release.items, reportsFor(await kvsReports.all(), keys));
+  return { release, decisions, pullRequestDecisions: onPullRequests, ready: releaseReady(decisions, onPullRequests) };
 }
