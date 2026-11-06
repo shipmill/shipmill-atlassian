@@ -11,6 +11,7 @@
     "./release": "./src/release.ts",
     "./pull-requests": "./src/pull-requests.ts",
     "./work-item": "./src/work-item.ts",
-    "./decision": "./src/decision.ts"
+    "./decision": "./src/decision.ts",
+    "./pull-request-decisions": "./src/pull-request-decisions.ts"
   }
 }
