@@ -92,3 +92,28 @@ test('a work item query with a key that is not a key is malformed', () => {
   const body = JSON.stringify({ kind: 'work-item', sentAt: NOW, key: 'HRB-2 and more' });
   rejects('malformed', () => decode(SECRET, body, sign(SECRET, body), NOW));
 });
+
+test('a pull request decisions report decodes, an empty list included', () => {
+  const report: BridgeMessage = {
+    kind: 'pullrequest-decisions',
+    sentAt: NOW,
+    workspace: '{w}',
+    repository: '{r}',
+    id: 7,
+    title: 'HRB-7 Judge check',
+    url: 'https://bitbucket.org/w/r/pull-requests/7',
+    open: [{ taskId: 41, question: 'ship the CSV export behind a flag?' }],
+  };
+  for (const message of [report, { ...report, open: [] }]) {
+    const { body, signature } = encode(SECRET, message);
+    assert.deepEqual(decode(SECRET, body, signature, NOW), message);
+  }
+});
+
+test('a pull request decisions report with a task out of shape is malformed', () => {
+  const base = { kind: 'pullrequest-decisions', sentAt: NOW, workspace: '{w}', repository: '{r}', id: 7, title: 'HRB-7 x', url: 'u' };
+  for (const open of [undefined, {}, [{ taskId: -1, question: 'q?' }], [{ taskId: 1, question: ' ' }], ['task']]) {
+    const body = JSON.stringify({ ...base, open });
+    rejects('malformed', () => decode(SECRET, body, sign(SECRET, body), NOW));
+  }
+});

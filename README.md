@@ -213,6 +213,22 @@ it, so the panel makes no LLM call. An item labelled but not asked yet shows the
 finder read and the person shipmill will ask, after the asked ones. With nothing left, the
 panel shows Ready to ship.
 
+## A pull request's decision blocks the release
+
+A decision can also start on the pull request: anyone opens a task there that starts with
+`Decision needed:`. The Bitbucket app reports the pull request's unresolved decision tasks
+to the Jira app over the bridge, and Jira counts each as a blocker of the release the
+pull request's work item is in: the release read gives them as `pullRequestDecisions` next
+to the work items' own decisions, and the release is ready only when both are empty.
+Resolving the task and reporting again clears it; a declined pull request clears its
+decisions. The task shipmill opens to repeat a work item's question is not reported, since
+the work item already counts.
+
+Bitbucket has no event for a task, so the report goes out whenever the app reads the pull
+request: when it is opened, edited or commented on, when the merge check runs and when
+someone opens the pull request page with its card. Jira keeps the report per pull request,
+so a title edited to name another work item moves the decisions with it.
+
 ## Privacy
 
 See [PRIVACY.md](PRIVACY.md).

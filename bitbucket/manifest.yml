@@ -35,6 +35,10 @@ modules:
       function: on-pull-request-comment
       events:
         - avi:bitbucket:created:pullrequest-comment
+    - key: pull-request-declined
+      function: on-pull-request-decline
+      events:
+        - avi:bitbucket:rejected:pullrequest
   function:
     - key: on-pull-request
       handler: index.onPullRequest
@@ -44,6 +48,8 @@ modules:
       handler: index.onPullRequestUpdated
     - key: on-pull-request-comment
       handler: index.onPullRequestComment
+    - key: on-pull-request-decline
+      handler: index.onPullRequestDeclined
     - key: on-merge-check
       handler: index.onMergeCheck
     - key: card-resolver

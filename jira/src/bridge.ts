@@ -6,6 +6,7 @@ import { findJiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { forgeDecisionJira } from './decision-jira';
 import { forgeIssueRest, forgeJiraRest } from './jira-rest';
 import { decisionView, relayPullRequestReply } from './pull-request-decision';
+import { kvsReports, recordReport } from './pull-request-report';
 import { kvsPullRequests, rememberLinkedPullRequest } from './pull-request-store';
 import { llmReplyReader } from './relay';
 import { bridgeSecret, llmEnabled } from './settings';
@@ -38,6 +39,11 @@ export async function onBridgeRequest(request: WebTriggerRequest): Promise<WebTr
       return respond(200, { paired: true });
     case 'pullrequest-opened':
       return respond(200, await pullRequestOpened(message));
+    case 'pullrequest-decisions': {
+      const outcome = await recordReport(message, { store: kvsReports, link: rememberLinkedPullRequest });
+      console.log(`pull request ${message.id} decisions: ${JSON.stringify(outcome)}`);
+      return respond(200, outcome);
+    }
     case 'work-item':
       return respond(200, await workItemStatus(forgeJiraRest, forgeIssueRest, kvsPullRequests, message.key));
     case 'decision':

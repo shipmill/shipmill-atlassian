@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { findJiraKey, type JiraKey } from './jira-key';
+import type { OpenTask } from './pull-request-decisions';
 import type { CommentId, Person } from './release';
 
 // The Bitbucket app tells the Jira app about pull requests through the Jira app's web trigger.
@@ -39,7 +40,20 @@ export type DecisionReply = {
   pullRequest: { id: number; url: string };
 };
 
-export type BridgeMessage = Ping | PullRequestOpened | WorkItemQuery | DecisionQuery | DecisionReply;
+// The decisions open on a pull request now, all of them each time: an empty list clears
+// what was reported before. The Jira app answers with a ReportOutcome
+export type PullRequestDecisions = {
+  kind: 'pullrequest-decisions';
+  sentAt: number;
+  workspace: string;
+  repository: string;
+  id: number;
+  title: string;
+  url: string;
+  open: OpenTask[];
+};
+
+export type BridgeMessage = Ping | PullRequestOpened | WorkItemQuery | DecisionQuery | DecisionReply | PullRequestDecisions;
 
 export type BridgeErrorCode = 'bad-signature' | 'stale' | 'malformed';
 
@@ -103,6 +117,17 @@ function parse(fields: Record<string, unknown>): BridgeMessage {
         title: text(fields, 'title'),
         url: text(fields, 'url'),
       };
+    case 'pullrequest-decisions':
+      return {
+        kind: 'pullrequest-decisions',
+        sentAt,
+        workspace: text(fields, 'workspace'),
+        repository: text(fields, 'repository'),
+        id: integer(fields, 'id'),
+        title: text(fields, 'title'),
+        url: text(fields, 'url'),
+        open: openTasks(fields),
+      };
     case 'work-item':
       return { kind: 'work-item', sentAt, key: workItemKey(fields) };
     case 'decision':
@@ -139,14 +164,24 @@ function nested(fields: Record<string, unknown>, name: string): Record<string, u
   return value as Record<string, unknown>;
 }
 
+function openTasks(fields: Record<string, unknown>): OpenTask[] {
+  const value = fields.open;
+  if (!Array.isArray(value)) throw new BridgeError('malformed', 'open is not a list');
+  return value.map((entry: unknown, index) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) throw new BridgeError('malformed', `open[${index}] is not an object`);
+    const task = entry as Record<string, unknown>;
+    return { taskId: integer(task, `open[${index}].taskId`, 'taskId'), question: text(task, `open[${index}].question`, 'question') };
+  });
+}
+
 function workItemKey(fields: Record<string, unknown>): JiraKey {
   const value = text(fields, 'key');
   if (findJiraKey(value) !== value) throw new BridgeError('malformed', `key ${JSON.stringify(value)} is not a Jira work item key`);
   return value as JiraKey;
 }
 
-function integer(fields: Record<string, unknown>, name: string): number {
-  const value = fields[name];
+function integer(fields: Record<string, unknown>, name: string, field = name): number {
+  const value = fields[field];
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
     throw new BridgeError('malformed', `${name} is not a non-negative integer`);
   }
