@@ -10,6 +10,7 @@
     "./parse": "./src/parse.ts",
     "./release": "./src/release.ts",
     "./pull-requests": "./src/pull-requests.ts",
-    "./work-item": "./src/work-item.ts"
+    "./work-item": "./src/work-item.ts",
+    "./decision": "./src/decision.ts"
   }
 }

@@ -1,4 +1,5 @@
 import type { Prompt } from '@forge/llm';
+import type { DecisionOption } from '@shipmill-atlassian/shared/decision';
 import type { JiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { list, nonEmpty, object } from '@shipmill-atlassian/shared/parse';
 import type { Person, Release, WorkItem } from '@shipmill-atlassian/shared/release';
@@ -12,7 +13,7 @@ import { logUsage, toolArguments } from './llm-tool';
 // With the LLM on Claude writes the question, options and reasons; with it off they come
 // from a template, which reads the alternatives out of an "A, or B?" question.
 
-export type DecisionOption = { text: string; reason: string };
+export type { DecisionOption };
 
 export type Prepared = {
   key: JiraKey;

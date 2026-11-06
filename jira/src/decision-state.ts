@@ -1,11 +1,13 @@
+import { parseDecisionOption, type DecisionOption } from '@shipmill-atlassian/shared/decision';
 import { boolean, list, natural, nonEmpty, object, oneOf } from '@shipmill-atlassian/shared/parse';
 import { commentId, parsePerson, timestamp, type CommentId, type Person } from '@shipmill-atlassian/shared/release';
-import type { DecisionOption } from './prepare';
 
 // What shipmill asked on a work item and whether it is answered, kept in the item's
 // shipmill-decision entity property. It stands in for the protocol's marker comment: the
 // question is the comment it names, posted by the app, and only a newer comment by the
-// decider can answer it. The needs-decision label stays the sign a person reads.
+// decider can answer it. The needs-decision label stays the sign a person reads. replyId is
+// the Jira comment that ends the wait: the decider's reply, or for a reply made on a pull
+// request, shipmill's relay comment that quotes it.
 
 export const PROPERTY = 'shipmill-decision';
 
@@ -26,10 +28,7 @@ export type DecisionState =
 
 export function parseDecisionState(value: unknown, path = PROPERTY): DecisionState {
   const fields = object(value, path);
-  const options = list(fields.options, `${path}.options`, (entry, at) => {
-    const option = object(entry, at);
-    return { text: nonEmpty(option.text, `${at}.text`), reason: nonEmpty(option.reason, `${at}.reason`) };
-  });
+  const options = list(fields.options, `${path}.options`, parseDecisionOption);
   const asked: Asked = {
     questionId: commentId(nonEmpty(fields.questionId, `${path}.questionId`)),
     question: nonEmpty(fields.question, `${path}.question`),

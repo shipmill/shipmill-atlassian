@@ -57,15 +57,25 @@ test('an open decision on the work item fails the check, and passes once decided
 });
 
 test('an unresolved decision task on the pull request fails the check, and passes once resolved', () => {
-  const asked: Facts = { ...CLEAR, tasks: [{ state: 'UNRESOLVED', text: 'Decision needed: keep the v1\nendpoint as a redirect?' }] };
+  const asked: Facts = { ...CLEAR, tasks: [{ id: 1, state: 'UNRESOLVED', text: 'Decision needed: keep the v1\nendpoint as a redirect?' }] };
   assert.deepEqual(holds(asked), [
     { kind: 'decision', message: 'this pull request waits on a decision: keep the v1 endpoint as a redirect?', waitsOn: 'Dana Okafor' },
   ]);
-  assert.equal(checkResult({ ...asked, tasks: [{ state: 'RESOLVED', text: 'Decision needed: keep the v1 endpoint as a redirect?' }] }).success, true);
+  assert.equal(checkResult({ ...asked, tasks: [{ id: 1, state: 'RESOLVED', text: 'Decision needed: keep the v1 endpoint as a redirect?' }] }).success, true);
+});
+
+test('a decision task asking the work item\'s own open decision is one hold, not two', () => {
+  const question = 'retire v1 tokens in 2.4, or keep them?';
+  const both: Facts = {
+    ...CLEAR,
+    workItem: { ...ITEM, openDecisions: [question] },
+    tasks: [{ id: 3, state: 'UNRESOLVED', text: `Decision needed: ${question}` }],
+  };
+  assert.deepEqual(holds(both), [{ kind: 'decision', message: `HRB-2 waits on a decision: ${question}`, waitsOn: 'Dana Okafor' }]);
 });
 
 test('an ordinary task is not a decision', () => {
-  assert.deepEqual(holds({ ...CLEAR, tasks: [{ state: 'UNRESOLVED', text: 'Rename the variable' }] }), []);
+  assert.deepEqual(holds({ ...CLEAR, tasks: [{ id: 2, state: 'UNRESOLVED', text: 'Rename the variable' }] }), []);
 });
 
 test('a build that is not green on the head commit fails the check, and passes once green', () => {

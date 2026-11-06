@@ -27,11 +27,23 @@ modules:
       function: on-pull-request
       events:
         - avi:bitbucket:created:pullrequest
+    - key: pull-request-updated
+      function: on-pull-request-updated
+      events:
+        - avi:bitbucket:updated:pullrequest
+    - key: pull-request-comments
+      function: on-pull-request-comment
+      events:
+        - avi:bitbucket:created:pullrequest-comment
   function:
     - key: on-pull-request
       handler: index.onPullRequest
     - key: settings-resolver
       handler: index.settingsResolver
+    - key: on-pull-request-updated
+      handler: index.onPullRequestUpdated
+    - key: on-pull-request-comment
+      handler: index.onPullRequestComment
     - key: on-merge-check
       handler: index.onMergeCheck
     - key: card-resolver

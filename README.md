@@ -5,8 +5,9 @@ to Atlassian: the Jira app finds the decisions blocking a release and prepares e
 Bitbucket app holds pull requests on the same decisions. Built for Codegeist 2026.
 
 Work in progress: the apps pair with each other, the Jira app reads a release, finds its
-decisions, asks each one on its work item and relays the answer, and the Bitbucket app checks
-pull requests against them; there is no release panel yet.
+decisions, asks each one on its work item and relays the answer, and the Bitbucket app asks
+the same decisions on pull requests and checks pull requests against them; there is no
+release panel yet.
 
 ## Layout
 
@@ -14,7 +15,7 @@ pull requests against them; there is no release panel yet.
 |---|---|
 | `jira/` | The Jira app: the bridge web trigger, the admin page, the release reader, the decision finder, the preparer and the relay |
 | `jira/evals/` | The decision finder's eval set and its runner |
-| `bitbucket/` | The Bitbucket app: pull request events, the merge check, the pull request card and the workspace settings page |
+| `bitbucket/` | The Bitbucket app: pull request events, decisions on pull requests, the merge check, the pull request card and the workspace settings page |
 | `shared/` | Code both apps use: the signed bridge protocol, Jira keys, comment bodies |
 | `seed/` | A script that makes the demo release on a Jira site and a Bitbucket workspace |
 
@@ -163,6 +164,39 @@ is turned on later.
 In development the `dev` web trigger starts it: a signed
 `{"action":"prepare","project":"HRB","version":"2.4","llm":false}` asks the release's
 decisions, and `{"action":"decision","key":"HRB-2"}` shows what the item waits on.
+
+## Decisions on pull requests
+
+When the work item a pull request names waits on a question the Jira app asked, the
+Bitbucket app asks it on the pull request too, in the same frame:
+
+```text
+@Dana Okafor Decision needed: retire v1 tokens in 2.4, or keep them for one more release?
+
+1. Move HRB-2 out of 2.4 (recommended): 2.4 ships without waiting on this; the decision moves to the next version with the work item
+2. Retire v1 tokens in 2.4: decided now, and 2.4 ships with HRB-2 done this way
+3. Keep them for one more release: decided now, and 2.4 ships with HRB-2 done this way
+
+Evidence: asked on HRB-2 in Jira, the work item this pull request names; the answer is recorded there.
+
+Reply here with a number; shipmill takes this up as soon as you reply.
+```
+
+and opens a task on that comment, `Decision needed: <question>`, which the merge check holds
+the pull request on. It asks when the pull request is opened or edited, and whenever the
+merge check or the card runs, so a pull request opened before the question was asked gets it
+the next time someone looks at it. A pull request is asked each question once; the app keeps
+which comment and task asked it, which stands in for the protocol's hidden marker line.
+
+A newer comment on the pull request by the person asked goes to the Jira app over the
+bridge, which reads it exactly as a reply on the work item (by number, or by Claude while the
+LLM switch is on and the question was asked with it on) and checks again that it comes from
+the person asked. Once Jira records the answer, removes the label and posts the relay there,
+the pull request gets "Decision by `@Dana Okafor`, relayed by shipmill" with the answer and
+the task resolves, so the merge check passes. A reply without a number, with the LLM off,
+gets a note on the pull request asking for one. An answer given in Jira instead resolves the
+task the next time the pull request is opened, edited or checked. Anyone else's comment never
+counts.
 
 ## Privacy
 

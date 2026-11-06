@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ParseError } from '@shipmill-atlassian/shared/parse';
-import { filePath, parsePullRequest, parseStatus, parseTask } from './bitbucket-rest';
+import { filePath, parseComment, parsePullRequest, parseStatus, parseTask } from './bitbucket-rest';
 
 // Trimmed from GET /2.0/repositories/{workspace}/{repo}/pullrequests/{id}
 const BODY = {
@@ -40,9 +40,21 @@ test('a build status without a name is named by its key; an unknown state is ref
 
 test('reads a task', () => {
   assert.deepEqual(parseTask({ id: 1, state: 'UNRESOLVED', content: { raw: 'Decision needed: x?' } }, 't'), {
+    id: 1,
     state: 'UNRESOLVED',
     text: 'Decision needed: x?',
   });
+});
+
+test('reads a comment with its author', () => {
+  const body = {
+    id: 712,
+    content: { raw: '2', markup: 'markdown', html: '<p>2</p>' },
+    user: { account_id: '712020:dana', display_name: 'Dana Okafor', type: 'user' },
+    deleted: false,
+  };
+  assert.deepEqual(parseComment(body, 'c'), { id: 712, author: { accountId: '712020:dana', displayName: 'Dana Okafor' }, text: '2' });
+  assert.throws(() => parseComment({ ...body, user: undefined }, 'c'), ParseError);
 });
 
 test('a repository path keeps its directories and refuses to climb out', () => {

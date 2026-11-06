@@ -52,19 +52,26 @@ export async function relayReply(
   if (!newer(replyId, state.questionId)) return { key, relayed: false, reason: 'not-newer' };
   const reply = await deps.jira.comment(key, replyId);
   if (reply.author.accountId !== state.decider.accountId) return { key, relayed: false, reason: 'not-decider' };
-  const number = optionNumber(reply.text, state.options.length);
-  let answer: Answer | null = number === null ? null : { kind: 'option', number };
-  // The question said how to reply: a number while the LLM was off when it was asked
-  if (answer === null && state.llm && deps.reader !== null) answer = await deps.reader.read(state, reply.text);
-  if (answer === null) {
-    if (state.llm && deps.reader !== null) return { key, relayed: false, reason: 'no-answer' };
+  const reading = await readReply(state, reply.text, deps.reader);
+  if (reading === 'unread') {
     await deps.jira.postComment(key, unreadComment(state.decider, state.options.length));
     return { key, relayed: false, reason: 'unread' };
   }
-  await deps.jira.postComment(key, relayComment(reply.author, answerText(state, answer)));
+  if (reading === 'no-answer') return { key, relayed: false, reason: 'no-answer' };
+  await deps.jira.postComment(key, relayComment(reply.author, answerText(state, reading)));
   await deps.jira.label(key, false);
-  await deps.jira.setState(key, { ...state, status: 'decided', replyId, answer, decidedAt: deps.now().toISOString() });
-  return { key, relayed: true, answer };
+  await deps.jira.setState(key, { ...state, status: 'decided', replyId, answer: reading, decidedAt: deps.now().toISOString() });
+  return { key, relayed: true, answer: reading };
+}
+
+// What a reply by the decider decides. The question said how to reply: a number while the
+// LLM was off when it was asked, so only then is a reply without one "unread"; with it on,
+// Claude reads the reply, and one that decides nothing yet is "no-answer".
+export async function readReply(state: DecisionState, reply: string, reader: ReplyReader | null): Promise<Answer | 'unread' | 'no-answer'> {
+  const number = optionNumber(reply, state.options.length);
+  if (number !== null) return { kind: 'option', number };
+  if (!state.llm || reader === null) return 'unread';
+  return (await reader.read(state, reply)) ?? 'no-answer';
 }
 
 // Claude reads a free-text reply against the options

@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { findJiraKey, type JiraKey } from './jira-key';
+import type { CommentId, Person } from './release';
 
 // The Bitbucket app tells the Jira app about pull requests through the Jira app's web trigger.
 // The trigger URL is public, so each body is signed with a secret the two installs share,
@@ -23,7 +24,22 @@ export type Ping = { kind: 'ping'; sentAt: number };
 // Asks for the work item a pull request names; the Jira app answers with a WorkItemStatus
 export type WorkItemQuery = { kind: 'work-item'; sentAt: number; key: JiraKey };
 
-export type BridgeMessage = Ping | PullRequestOpened | WorkItemQuery;
+// Asks what shipmill asked on a work item; the Jira app answers with a DecisionView
+export type DecisionQuery = { kind: 'decision'; sentAt: number; key: JiraKey };
+
+// A reply made on a pull request to the question asked there; the Jira app relays it as it
+// would a comment on the work item and answers with a ReplyOutcome
+export type DecisionReply = {
+  kind: 'decision-reply';
+  sentAt: number;
+  key: JiraKey;
+  questionId: CommentId;
+  author: Person;
+  text: string;
+  pullRequest: { id: number; url: string };
+};
+
+export type BridgeMessage = Ping | PullRequestOpened | WorkItemQuery | DecisionQuery | DecisionReply;
 
 export type BridgeErrorCode = 'bad-signature' | 'stale' | 'malformed';
 
@@ -89,15 +105,38 @@ function parse(fields: Record<string, unknown>): BridgeMessage {
       };
     case 'work-item':
       return { kind: 'work-item', sentAt, key: workItemKey(fields) };
+    case 'decision':
+      return { kind: 'decision', sentAt, key: workItemKey(fields) };
+    case 'decision-reply': {
+      const questionId = text(fields, 'questionId');
+      if (!/^\d+$/.test(questionId)) throw new BridgeError('malformed', 'questionId is not a Jira comment id');
+      const author = nested(fields, 'author');
+      const pullRequest = nested(fields, 'pullRequest');
+      return {
+        kind: 'decision-reply',
+        sentAt,
+        key: workItemKey(fields),
+        questionId: questionId as CommentId,
+        author: { accountId: text(author, 'author.accountId', 'accountId'), displayName: text(author, 'author.displayName', 'displayName') },
+        text: text(fields, 'text'),
+        pullRequest: { id: integer(pullRequest, 'id'), url: text(pullRequest, 'pullRequest.url', 'url') },
+      };
+    }
     default:
       throw new BridgeError('malformed', `unknown kind ${JSON.stringify(fields.kind)}`);
   }
 }
 
-function text(fields: Record<string, unknown>, name: string): string {
-  const value = fields[name];
-  if (typeof value !== 'string' || value === '') throw new BridgeError('malformed', `${name} is not a non-empty string`);
+function text(fields: Record<string, unknown>, name: string, field = name): string {
+  const value = fields[field];
+  if (typeof value !== 'string' || value.trim() === '') throw new BridgeError('malformed', `${name} is not a non-empty string`);
   return value;
+}
+
+function nested(fields: Record<string, unknown>, name: string): Record<string, unknown> {
+  const value = fields[name];
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new BridgeError('malformed', `${name} is not an object`);
+  return value as Record<string, unknown>;
 }
 
 function workItemKey(fields: Record<string, unknown>): JiraKey {
