@@ -15,6 +15,7 @@ import ForgeReconciler, {
 } from '@forge/react';
 import React, { useEffect, useState } from 'react';
 import type { PanelView } from '../panel-resolver';
+import type { PullRequestDecision } from '../finder';
 import type { PanelDecision } from '../release-panel';
 
 // Without metadata requested, invoke resolves to the resolver's return value itself
@@ -51,6 +52,28 @@ function Decision({ decision }: { decision: PanelDecision }) {
   );
 }
 
+// Opened on the pull request as a "Decision needed:" task, and answered there
+function OnPullRequest({ decision }: { decision: PullRequestDecision }) {
+  const { pullRequest } = decision;
+  return (
+    <Box padding="space.150" xcss={{ borderColor: 'color.border', borderStyle: 'solid', borderWidth: 'border.width', borderRadius: 'radius.medium' }}>
+      <Stack space="space.075">
+        <Inline space="space.100" alignBlock="center">
+          <Link href={`/browse/${decision.key}`}>{decision.key}</Link>
+          <Text>on</Text>
+          <Link href={pullRequest.url} openNewTab>
+            {`${pullRequest.repository} #${pullRequest.id}`}
+          </Link>
+        </Inline>
+        <Text weight="medium">{decision.question}</Text>
+        <Text>
+          {decision.askOf === null ? 'Answer by resolving the task on the pull request' : `Waits on ${decision.askOf.displayName}, answer by resolving the task on the pull request`}
+        </Text>
+      </Stack>
+    </Box>
+  );
+}
+
 function App() {
   const [view, setView] = useState<PanelView>();
   const [picked, setPicked] = useState<string>();
@@ -76,6 +99,7 @@ function App() {
   if (view.panel === null) return <Text>This project has no open fix version.</Text>;
 
   const { panel } = view;
+  const blocking = panel.decisions.length + panel.pullRequestDecisions.length;
   const options = view.versions.map((name) => ({ label: name, value: name }));
   return (
     <Stack space="space.200">
@@ -108,10 +132,14 @@ function App() {
             <Lozenge appearance="moved" isBold>
               Blocked
             </Lozenge>
-            <Heading as="h3">{`${panel.decisions.length} ${panel.decisions.length === 1 ? 'decision blocks' : 'decisions block'} ${panel.version}, oldest first`}</Heading>
+            <Heading as="h3">{`${blocking} ${blocking === 1 ? 'decision blocks' : 'decisions block'} ${panel.version}`}</Heading>
           </Inline>
           {panel.decisions.map((decision) => (
             <Decision key={decision.key} decision={decision} />
+          ))}
+          {panel.pullRequestDecisions.length > 0 && <Heading as="h4">Opened on pull requests</Heading>}
+          {panel.pullRequestDecisions.map((decision) => (
+            <OnPullRequest key={`${decision.pullRequest.url}#${decision.taskId}`} decision={decision} />
           ))}
         </Stack>
       )}

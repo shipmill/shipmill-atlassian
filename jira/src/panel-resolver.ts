@@ -3,7 +3,9 @@ import Resolver from '@forge/resolver';
 import { projectKey, type ProjectKey } from '@shipmill-atlassian/shared/jira-key';
 import { ParseError, nonEmpty, object } from '@shipmill-atlassian/shared/parse';
 import { forgeDecisionJira } from './decision-jira';
+import { pullRequestDecisions } from './finder';
 import { forgeJiraRest } from './jira-rest';
+import { kvsReports, reportsFor } from './pull-request-report';
 import { kvsPullRequests } from './pull-request-store';
 import { readRelease } from './reader';
 import { openVersions, parseFixVersions, releasePanel, type ReleasePanel } from './release-panel';
@@ -28,7 +30,9 @@ export async function panelView(project: ProjectKey, picked: string | undefined)
   if (version === undefined) return { versions, panel: null };
   if (!versions.includes(version)) throw new ParseError('version', `${JSON.stringify(version)} is not an open fix version of ${project}`);
   const release = await readRelease(forgeJiraRest, kvsPullRequests, project, version);
-  return { versions, panel: await releasePanel(release, forgeDecisionJira) };
+  const keys = new Set(release.items.map((item) => item.key));
+  const onPullRequests = pullRequestDecisions(release.items, reportsFor(await kvsReports.all(), keys));
+  return { versions, panel: await releasePanel(release, forgeDecisionJira, onPullRequests) };
 }
 
 const resolver = new Resolver();

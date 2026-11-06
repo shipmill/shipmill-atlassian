@@ -3,14 +3,16 @@ import { boolean, list, nonEmpty, object } from '@shipmill-atlassian/shared/pars
 import type { LinkedPullRequest } from '@shipmill-atlassian/shared/pull-requests';
 import type { Person, Release } from '@shipmill-atlassian/shared/release';
 import type { DecisionJira } from './decision-jira';
-import { labelledDecisions } from './finder';
+import { labelledDecisions, type PullRequestDecision } from './finder';
 
 // The release panel: what a fix version still waits on, oldest first, and who each decision
 // waits on. A decision blocks while its work item is labelled needs-decision, as the merge
 // check counts it, so the panel never calls the LLM and answers inside a resolver's 25 s. What
 // shipmill asked (the question, the person asked, when) comes from the item's
 // shipmill-decision property; the answer can come from Jira or from a pull request in
-// Bitbucket, so the panel names the item's pull requests as the other place to answer.
+// Bitbucket, so the panel names the item's pull requests as the other place to answer. A
+// decision opened on a pull request (an unresolved "Decision needed:" task) blocks the release
+// too, so the panel lists those after the work items' own and is ready only when both are empty.
 
 export type PanelDecision = {
   key: JiraKey;
@@ -26,10 +28,16 @@ export type ReleasePanel = {
   project: ProjectKey;
   version: string;
   decisions: PanelDecision[];
+  // Asked and answered on the pull request, in work item order
+  pullRequestDecisions: PullRequestDecision[];
   ready: boolean;
 };
 
-export async function releasePanel(release: Release, jira: Pick<DecisionJira, 'state' | 'projectLead'>): Promise<ReleasePanel> {
+export async function releasePanel(
+  release: Release,
+  jira: Pick<DecisionJira, 'state' | 'projectLead'>,
+  onPullRequests: readonly PullRequestDecision[],
+): Promise<ReleasePanel> {
   let lead: Person | undefined;
   const asked: (PanelDecision & { askedAt: string })[] = [];
   const unasked: PanelDecision[] = [];
@@ -51,7 +59,13 @@ export async function releasePanel(release: Release, jira: Pick<DecisionJira, 's
   // is the newest, so it comes last, in key order
   asked.sort((a, b) => (a.askedAt < b.askedAt ? -1 : a.askedAt > b.askedAt ? 1 : 0));
   const decisions = [...asked, ...unasked];
-  return { project: release.project, version: release.version, decisions, ready: decisions.length === 0 };
+  return {
+    project: release.project,
+    version: release.version,
+    decisions,
+    pullRequestDecisions: [...onPullRequests],
+    ready: decisions.length === 0 && onPullRequests.length === 0,
+  };
 }
 
 // A project's fix versions, for the panel's picker. Jira lists them in the order the project
