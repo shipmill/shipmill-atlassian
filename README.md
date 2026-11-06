@@ -198,6 +198,31 @@ gets a note on the pull request asking for one. An answer given in Jira instead 
 task the next time the pull request is opened, edited or checked. Anyone else's comment never
 counts.
 
+## Evidence from the Teamwork Graph
+
+The preparer also asks the [Teamwork Graph](https://developer.atlassian.com/platform/teamwork-graph/)
+what is linked to the work item: its pull requests, its deployments and the teams it is
+assigned to. What it finds is added to the question's evidence line, and the teams are named
+as who may decide besides the person asked:
+
+```text
+Evidence: asked in the description of HRB-2: "..."; in the Teamwork Graph, pull request "HRB-2 Rejects API v1 tokens ..." (open, https://bitbucket.org/...); assigned to team Harbor API, who may decide too
+```
+
+Jira REST stays the source of everything else, so without the graph the comment is exactly
+as above. The graph answers only as a user: a prepare that runs for nobody, such as one the
+`dev` web trigger starts, reads Jira alone and logs that it did.
+
+The Jira app asks for four read-only graph scopes, only the object types its queries cross:
+`read:graph:issue:jira`, `read:graph:pull-request:external`,
+`read:graph:deployment:external` and `read:graph:team:atlassian`. **Installing the Jira app
+needs an organization admin**, who approves these graph scopes on install (and on an upgrade
+that adds them); a site admin alone cannot. An admin can also turn single scopes off in
+Atlassian Administration. A scope that is not granted does not fail a query, it empties it,
+so the app logs every empty list with the scopes it needed, and says so plainly when
+Bitbucket links a pull request the graph does not return. The Teamwork Graph is in Forge
+Preview: its schema may change before general availability.
+
 ## Privacy
 
 See [PRIVACY.md](PRIVACY.md).

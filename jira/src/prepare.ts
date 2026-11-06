@@ -4,6 +4,7 @@ import type { JiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { list, nonEmpty, object } from '@shipmill-atlassian/shared/parse';
 import type { Person, Release, WorkItem } from '@shipmill-atlassian/shared/release';
 import type { Decision } from './finder';
+import { QUERY_SCOPES, type GraphEvidence, type GraphLookup, type WorkItemGraph } from './graph';
 import { describeRelease, MODEL, type Chat } from './llm-finder';
 import { logUsage, toolArguments } from './llm-tool';
 
@@ -188,6 +189,50 @@ export function llmPreparer(chat: Chat, log: (line: string) => void = console.lo
       logUsage(log, `llm preparer ${decision.key}`, started, response);
       const { question, options } = parsePrepared(toolArguments(response, TOOL, (message) => new PrepareError(message)));
       return { key: decision.key, question, options, evidence: evidence(decision, item), decider, llm: true };
+    },
+  };
+}
+
+// The Teamwork Graph's evidence, appended to what the reader found: linked pull requests and
+// deployments, and the teams the item is assigned to as who may decide besides the person
+// asked. Without the graph, or with nothing in it, the evidence is exactly the reader's.
+
+const STATE: Record<string, string> = { IN_PROGRESS: 'in progress', ROLLED_BACK: 'rolled back' };
+
+function state(value: string): string {
+  return STATE[value] ?? value.toLowerCase();
+}
+
+export function graphEvidence(graph: GraphEvidence): string | undefined {
+  const parts = [
+    ...graph.pullRequests.map((pr) => `pull request "${quote(pr.title)}" (${state(pr.status)}, ${pr.url})`),
+    ...graph.deployments.map((deploy) => `deployment ${deploy.name} to ${deploy.environment} (${state(deploy.state)}, ${deploy.url})`),
+  ];
+  const teams = graph.teams.map((team) => team.name);
+  if (teams.length > 0) parts.push(`assigned to ${teams.length === 1 ? 'team' : 'teams'} ${teams.join(', ')}, who may decide too`);
+  return parts.length === 0 ? undefined : `in the Teamwork Graph, ${parts.join('; ')}`;
+}
+
+// What the graph read for one item, for the log: every empty list names the scopes it
+// needed, since an ungranted scope empties a query instead of failing it
+export function graphNotes(key: JiraKey, item: WorkItem, lookup: GraphLookup): string[] {
+  if (lookup.status === 'unavailable') return [`graph ${key}: not read, ${lookup.reason}`];
+  return lookup.empty.map((list) => {
+    const scopes = QUERY_SCOPES[list].join(', ');
+    if (list === 'pullRequests' && item.pullRequests.length > 0) {
+      return `graph ${key}: no pull requests, yet Bitbucket links ${item.pullRequests.length}; check that an admin granted ${scopes}`;
+    }
+    return `graph ${key}: no ${list}; either none is linked or ${scopes} is not granted`;
+  });
+}
+
+export function withGraph(preparer: Preparer, graph: WorkItemGraph, log: (line: string) => void = console.log): Preparer {
+  return {
+    async prepare(decision, item, release, decider) {
+      const [prepared, lookup] = await Promise.all([preparer.prepare(decision, item, release, decider), graph.lookup(decision.key)]);
+      for (const note of graphNotes(decision.key, item, lookup)) log(note);
+      const found = lookup.status === 'read' ? graphEvidence(lookup.evidence) : undefined;
+      return found === undefined ? prepared : { ...prepared, evidence: `${prepared.evidence}; ${found}` };
     },
   };
 }
