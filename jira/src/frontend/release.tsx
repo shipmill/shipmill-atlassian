@@ -14,6 +14,7 @@ import ForgeReconciler, {
   Text,
 } from '@forge/react';
 import React, { useEffect, useState } from 'react';
+import { pullRequestLabel } from '@shipmill-atlassian/shared/pull-requests';
 import type { PanelView } from '../panel-resolver';
 import type { PullRequestDecision } from '../finder';
 import type { PanelDecision } from '../release-panel';
@@ -42,7 +43,7 @@ function Decision({ decision }: { decision: PanelDecision }) {
             <Text>Answer in Jira or on</Text>
             {decision.pullRequests.map((pullRequest) => (
               <Link key={pullRequest.url} href={pullRequest.url} openNewTab>
-                {`${pullRequest.repository} #${pullRequest.id}`}
+                {pullRequestLabel(pullRequest)}
               </Link>
             ))}
           </Inline>
@@ -62,7 +63,7 @@ function OnPullRequest({ decision }: { decision: PullRequestDecision }) {
           <Link href={`/browse/${decision.key}`}>{decision.key}</Link>
           <Text>on</Text>
           <Link href={pullRequest.url} openNewTab>
-            {`${pullRequest.repository} #${pullRequest.id}`}
+            {pullRequestLabel(pullRequest)}
           </Link>
         </Inline>
         <Text weight="medium">{decision.question}</Text>

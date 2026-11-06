@@ -10,6 +10,7 @@ const OPENED: BridgeMessage = {
   sentAt: NOW,
   workspace: '{w}',
   repository: '{r}',
+  repositorySlug: 'r',
   id: 7,
   title: 'KAN-4 Judge check',
   url: 'https://bitbucket.org/w/r/pull-requests/7',
@@ -99,6 +100,7 @@ test('a pull request decisions report decodes, an empty list included', () => {
     sentAt: NOW,
     workspace: '{w}',
     repository: '{r}',
+    repositorySlug: 'r',
     id: 7,
     title: 'HRB-7 Judge check',
     url: 'https://bitbucket.org/w/r/pull-requests/7',
@@ -107,6 +109,14 @@ test('a pull request decisions report decodes, an empty list included', () => {
   for (const message of [report, { ...report, open: [] }]) {
     const { body, signature } = encode(SECRET, message);
     assert.deepEqual(decode(SECRET, body, signature, NOW), message);
+  }
+});
+
+test('a pull request message without its repository slug is malformed', () => {
+  const { repositorySlug: _, ...unnamed } = OPENED as Extract<BridgeMessage, { kind: 'pullrequest-opened' }>;
+  for (const message of [unnamed, { ...unnamed, repositorySlug: '' }]) {
+    const body = JSON.stringify(message);
+    rejects('malformed', () => decode(SECRET, body, sign(SECRET, body), NOW));
   }
 });
 

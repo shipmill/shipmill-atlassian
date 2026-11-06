@@ -14,7 +14,9 @@ export type PullRequestOpened = {
   kind: 'pullrequest-opened';
   sentAt: number;
   workspace: string;
+  // The repository's uuid, which identifies the pull request, and its slug, which labels it
   repository: string;
+  repositorySlug: string;
   id: number;
   title: string;
   url: string;
@@ -46,7 +48,9 @@ export type PullRequestDecisions = {
   kind: 'pullrequest-decisions';
   sentAt: number;
   workspace: string;
+  // The repository's uuid, which identifies the pull request, and its slug, which labels it
   repository: string;
+  repositorySlug: string;
   id: number;
   title: string;
   url: string;
@@ -113,6 +117,7 @@ function parse(fields: Record<string, unknown>): BridgeMessage {
         sentAt,
         workspace: text(fields, 'workspace'),
         repository: text(fields, 'repository'),
+        repositorySlug: text(fields, 'repositorySlug'),
         id: integer(fields, 'id'),
         title: text(fields, 'title'),
         url: text(fields, 'url'),
@@ -123,6 +128,7 @@ function parse(fields: Record<string, unknown>): BridgeMessage {
         sentAt,
         workspace: text(fields, 'workspace'),
         repository: text(fields, 'repository'),
+        repositorySlug: text(fields, 'repositorySlug'),
         id: integer(fields, 'id'),
         title: text(fields, 'title'),
         url: text(fields, 'url'),

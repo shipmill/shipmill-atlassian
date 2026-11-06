@@ -30,6 +30,7 @@ const SEEDED: PullRequest = {
   id: 2,
   title: 'HRB-2 Rejects API v1 tokens with a pointer to the migration guide',
   url: 'https://bitbucket.org/shipmill-dev/harbor/pull-requests/2',
+  repositorySlug: 'harbor',
   author: SAM,
   sourceCommit: '0123456789abcdef',
   destinationBranch: 'main',

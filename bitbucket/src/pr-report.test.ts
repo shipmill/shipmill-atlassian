@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { decode, encode } from '@shipmill-atlassian/shared/bridge';
 import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { parseReportOutcome } from '@shipmill-atlassian/shared/pull-request-decisions';
+import { pullRequestLabel } from '@shipmill-atlassian/shared/pull-requests';
 import { NEEDS_DECISION, type Release } from '@shipmill-atlassian/shared/release';
 import { FakeReports } from '../../jira/src/fake-reports';
 import { seedRelease } from '../../jira/src/fixtures';
@@ -27,6 +28,7 @@ const SEEDED: PullRequest = {
   id: 1,
   title: 'HRB-1 Adds a CSV export to the invoice list',
   url: 'https://bitbucket.org/shipmill-dev/harbor/pull-requests/1',
+  repositorySlug: 'harbor',
   author: SAM,
   sourceCommit: '0123456789abcdef',
   destinationBranch: 'main',
@@ -81,6 +83,8 @@ test('the report names the pull request by braced uuids, so the card and the eve
   const deps = { report: bridged(reports), store: new FakeQuestions(), workspace: WORKSPACE.slice(1, -1), repository: REPOSITORY.slice(1, -1) };
   await reportDecisions(deps, SEEDED, [{ id: 7, state: 'UNRESOLVED', text: 'Decision needed: ship it?' }]);
   assert.deepEqual(reports.linked.map((entry) => [entry.pullRequest.workspace, entry.pullRequest.repository]), [[WORKSPACE, REPOSITORY]]);
+  // The uuid identifies it, the slug carried next to it labels it in the release panel
+  assert.deepEqual(reports.linked.map((entry) => pullRequestLabel(entry.pullRequest)), ['harbor #1']);
   assert.equal(braced(REPOSITORY.toUpperCase()), REPOSITORY);
   assert.throws(() => braced('harbor'), /not a Bitbucket uuid/);
 });
