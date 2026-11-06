@@ -4,14 +4,15 @@ Two Forge apps that bring [shipmill](https://github.com/shipmill/shipmill)'s rel
 to Atlassian: the Jira app finds the decisions blocking a release and prepares each one, the
 Bitbucket app holds pull requests on the same decisions. Built for Codegeist 2026.
 
-Work in progress: the apps pair with each other, the Jira app reads a release and finds its
-decisions, and the Bitbucket app checks pull requests against them.
+Work in progress: the apps pair with each other, the Jira app reads a release, finds its
+decisions, asks each one on its work item and relays the answer, and the Bitbucket app checks
+pull requests against them; there is no release panel yet.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `jira/` | The Jira app: the bridge web trigger, the admin page, the release reader and the decision finder |
+| `jira/` | The Jira app: the bridge web trigger, the admin page, the release reader, the decision finder, the preparer and the relay |
 | `jira/evals/` | The decision finder's eval set and its runner |
 | `bitbucket/` | The Bitbucket app: pull request events, the merge check, the pull request card and the workspace settings page |
 | `shared/` | Code both apps use: the signed bridge protocol, Jira keys, comment bodies |
@@ -122,6 +123,46 @@ runs the 15 cases in `jira/evals/cases` with the LLM off, locally and free. With
 LLM (billed); set `SHIPMILL_DEV_TRIGGER_URL` to the `dev` web trigger's URL and
 `SHIPMILL_BRIDGE_SECRET` to the secret on the admin page. The `dev` trigger answers only in
 the development environment.
+
+## Asking a decision and relaying the answer
+
+For each decision the app posts one comment on its work item, in the frame of shipmill's
+[needs-decision protocol](https://github.com/shipmill/shipmill/blob/main/skills/github-issue-triage/references/needs-decision.md):
+
+```text
+@Dana Okafor Decision needed: retire v1 tokens in 2.4, or keep them for one more release?
+
+1. Move HRB-2 out of 2.4 (recommended): 2.4 ships without waiting on this; the decision moves to the next version with the work item
+2. Retire v1 tokens in 2.4: decided now, and 2.4 ships with HRB-2 done this way
+3. Keep them for one more release: decided now, and 2.4 ships with HRB-2 done this way
+
+Evidence: asked in the description of HRB-2: "Decision needed: retire v1 tokens in 2.4, ..."
+
+Reply here with a number; shipmill takes this up as soon as you reply.
+```
+
+It mentions the person who decides (the item's assignee, else its reporter, else the
+project lead), adds the `needs-decision` label when the item lacks it, and records the
+question in the item's `shipmill-decision` property, which stands in for the protocol's
+hidden marker line: Jira comments have no hidden text. An item already waiting is not asked
+again.
+
+- **LLM on:** Claude writes the question, the options and their reasons, and reads a
+  free-text reply
+- **LLM off:** the options come from a template: moving the item out of the version, then
+  the alternatives an "A, or B?" question names; a reply is read as an option number
+
+A newer comment by the person asked ends the wait: the app posts "Decision by `@Dana Okafor`,
+relayed by shipmill" with the answer, removes the label, and records the answer in the
+property. Anyone else's comment never counts. A reply starting with an option number is read
+by code; with the LLM off, any other reply gets a note asking for a number, and with it on,
+a reply Claude reads as no decision yet (a question back, "let me check") keeps the wait
+without a note. A question asked with the LLM off is answered by number even if the switch
+is turned on later.
+
+In development the `dev` web trigger starts it: a signed
+`{"action":"prepare","project":"HRB","version":"2.4","llm":false}` asks the release's
+decisions, and `{"action":"decision","key":"HRB-2"}` shows what the item waits on.
 
 ## Privacy
 

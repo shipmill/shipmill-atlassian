@@ -2,15 +2,18 @@ import { getAppContext } from '@forge/api';
 import { Queue } from '@forge/events';
 import { kvs } from '@forge/kvs';
 import { BridgeError, SIGNATURE_HEADER, verify } from '@shipmill-atlassian/shared/bridge';
-import { projectKey } from '@shipmill-atlassian/shared/jira-key';
-import { ParseError, list, nonEmpty, object, type Fields } from '@shipmill-atlassian/shared/parse';
+import { jiraKey, projectKey } from '@shipmill-atlassian/shared/jira-key';
+import { ParseError, boolean, list, nonEmpty, object, type Fields } from '@shipmill-atlassian/shared/parse';
 import { parseRelease } from '@shipmill-atlassian/shared/release';
+import { forgeDecisionJira } from './decision-jira';
 import { forgeImplicitFinder, releaseDecisions } from './decisions';
 import { ImplicitDecisionError, findDecisions, type Decision } from './finder';
+import { enqueuePrepare } from './relay-trigger';
 import { bridgeSecret } from './settings';
 
 // A web trigger for development only, signed with the bridge secret like the bridge itself:
-// it reads a live release (no LLM) and runs the eval cases through Forge LLM, which bills
+// it reads a live release (no LLM), prepares a release's decisions, reads what an item
+// waits on, and runs the eval cases through Forge LLM, which bills
 // the Developer Space. Every other environment answers 404 before reading the body.
 
 type WebTriggerRequest = { body?: string; headers?: Record<string, string[] | undefined> };
@@ -55,6 +58,18 @@ async function act(fields: Fields): Promise<object> {
     case 'release': {
       const project = projectKey(nonEmpty(fields.project, 'project'));
       return releaseDecisions(project, nonEmpty(fields.version, 'version'), false);
+    }
+    // Prepares and asks the release's decisions in the prepare consumer. llm is explicit:
+    // true bills Forge LLM for every decision, and the relay reads replies the same way
+    case 'prepare': {
+      const project = projectKey(nonEmpty(fields.project, 'project'));
+      await enqueuePrepare(project, nonEmpty(fields.version, 'version'), boolean(fields.llm, 'llm'));
+      return { queued: true };
+    }
+    // What was asked on a work item and whether it is answered
+    case 'decision': {
+      const key = jiraKey(nonEmpty(fields.key, 'key'));
+      return { key, state: (await forgeDecisionJira.state(key)) ?? null };
     }
     // One queue event per case, so each case gets its own 300 s and a slow one holds up no other
     case 'eval-start': {
