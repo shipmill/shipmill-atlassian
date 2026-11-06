@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { jiraKey } from './jira-key';
 import { BridgeError, MAX_SKEW_MS, decode, encode, sign, verify, type BridgeMessage } from './bridge';
 
 const SECRET = 'a-shared-secret';
@@ -74,4 +75,20 @@ test('verify accepts any signed object and refuses arrays and stale bodies', () 
   rejects('malformed', () => verify(SECRET, list, sign(SECRET, list), NOW));
   rejects('stale', () => verify(SECRET, body, sign(SECRET, body), NOW + MAX_SKEW_MS + 1));
   rejects('bad-signature', () => verify(SECRET, body, sign('other', body), NOW));
+});
+
+test('a work item query decodes', () => {
+  const query: BridgeMessage = { kind: 'work-item', sentAt: NOW, key: jiraKey('HRB-2') };
+  const { body, signature } = encode(SECRET, query);
+  assert.deepEqual(decode(SECRET, body, signature, NOW), query);
+});
+
+test('a work item query without a key is malformed', () => {
+  const body = JSON.stringify({ kind: 'work-item', sentAt: NOW });
+  rejects('malformed', () => decode(SECRET, body, sign(SECRET, body), NOW));
+});
+
+test('a work item query with a key that is not a key is malformed', () => {
+  const body = JSON.stringify({ kind: 'work-item', sentAt: NOW, key: 'HRB-2 and more' });
+  rejects('malformed', () => decode(SECRET, body, sign(SECRET, body), NOW));
 });

@@ -1,4 +1,4 @@
-import api, { route } from '@forge/api';
+import { forgeBitbucket } from './bitbucket-rest';
 import { sendToJira } from './bridge';
 import { pairing } from './settings';
 
@@ -12,24 +12,6 @@ type PullRequestEvent = {
   pullrequest: { id: number };
 };
 
-type PullRequest = { title: string; url: string };
-
-async function readPullRequest(workspace: string, repository: string, id: number): Promise<PullRequest> {
-  const response = await api
-    .asApp()
-    .requestBitbucket(route`/2.0/repositories/${workspace}/${repository}/pullrequests/${id}`);
-  if (!response.ok) {
-    throw new Error(`reading pull request ${id} failed: ${response.status} ${await response.text()}`);
-  }
-  const body = (await response.json()) as { title?: unknown; links?: { html?: { href?: unknown } } };
-  const title = body.title;
-  const url = body.links?.html?.href;
-  if (typeof title !== 'string' || typeof url !== 'string') {
-    throw new Error(`pull request ${id} came back without a title or an HTML link`);
-  }
-  return { title, url };
-}
-
 export async function onPullRequest(event: PullRequestEvent): Promise<void> {
   if (event.selfGenerated === true) return;
   const paired = await pairing();
@@ -40,7 +22,7 @@ export async function onPullRequest(event: PullRequestEvent): Promise<void> {
   const workspace = event.workspace.uuid;
   const repository = event.repository.uuid;
   const { id } = event.pullrequest;
-  const { title, url } = await readPullRequest(workspace, repository, id);
+  const { title, url } = await forgeBitbucket(workspace, repository).pullRequest(id);
   const answer = await sendToJira(paired, {
     kind: 'pullrequest-opened',
     sentAt: Date.now(),

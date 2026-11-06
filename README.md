@@ -4,9 +4,9 @@ Two Forge apps that bring [shipmill](https://github.com/shipmill/shipmill)'s rel
 to Atlassian: the Jira app finds the decisions blocking a release and prepares each one, the
 Bitbucket app holds pull requests on the same decisions. Built for Codegeist 2026.
 
-Work in progress: the apps pair with each other, and the Jira app reads a release, finds its
-decisions, asks each one on its work item and relays the answer; there is no release panel
-yet.
+Work in progress: the apps pair with each other, the Jira app reads a release, finds its
+decisions, asks each one on its work item and relays the answer, and the Bitbucket app checks
+pull requests against them; there is no release panel yet.
 
 ## Layout
 
@@ -14,7 +14,7 @@ yet.
 |---|---|
 | `jira/` | The Jira app: the bridge web trigger, the admin page, the release reader, the decision finder, the preparer and the relay |
 | `jira/evals/` | The decision finder's eval set and its runner |
-| `bitbucket/` | The Bitbucket app: pull request events and the workspace settings page |
+| `bitbucket/` | The Bitbucket app: pull request events, the merge check, the pull request card and the workspace settings page |
 | `shared/` | Code both apps use: the signed bridge protocol, Jira keys, comment bodies |
 | `seed/` | A script that makes the demo release on a Jira site and a Bitbucket workspace |
 
@@ -26,6 +26,37 @@ yet.
 
 The Bitbucket app stores the pairing only after a signed test message reaches the Jira app.
 Generating a new secret in Jira breaks the pairing until it is pasted into Bitbucket again.
+
+## The merge check and the pull request card
+
+The Bitbucket app's merge check, shipmill Release Decisions, fails a pull request while any
+of these holds:
+
+- **An open decision:** the Jira work item named in the title is labelled `needs-decision`,
+  or the pull request has an unresolved task that starts with `Decision needed:`
+- **A build that is not green on the head commit:** a build status on the source branch's
+  head commit is failed, stopped or still running, or no build has reported on it
+- **An undecided breaking change:** the pull request adds an entry under `### Breaking` in
+  the changelog's Unreleased section, and the work item's decider (its assignee, else its
+  reporter) has not approved the pull request
+
+It reads everything fresh on each run, so rerunning it after a hold is lifted passes. The
+check asks the paired Jira app about the work item over the signed bridge and counts only
+labelled decisions there, never the LLM, so a check costs nothing. `shipmill.toml` and the
+changelog are read at the destination branch's commit, so a pull request can't change the
+policy it is judged by.
+
+The pull request card shows the work item's release (its fix versions), the lanes a merge
+releases in (from `shipmill.toml`: the policy's branch feeds every lane but `hotfix`, a
+`release/X.Y` branch feeds `hotfix`), and who the pull request waits on.
+
+**On a free workspace the check is advice.** Bitbucket blocks a merge on a failed check only
+where an admin marks the check Required, which needs Bitbucket Premium. Elsewhere the check
+and the card show the holds as advice, and their wording says so; neither claims a block.
+
+To turn it on, a workspace admin enables custom merge checks in the workspace settings, then
+adds shipmill Release Decisions to a repository, project or the workspace with a branch
+pattern (for example `main`).
 
 ## Develop
 

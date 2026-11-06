@@ -6,6 +6,22 @@ modules:
       resolver:
         function: settings-resolver
       render: native
+  bitbucket:mergeCheck:
+    - key: release-decisions-check
+      name: shipmill Release Decisions
+      description: Waits for open decisions, a green build on the head commit, and a decided breaking change
+      function: on-merge-check
+      triggers:
+        - on-code-pushed
+        - on-reviewer-status-changed
+        - on-merge
+  bitbucket:repoPullRequestCard:
+    - key: release-card
+      title: shipmill Release Decisions
+      resource: card
+      resolver:
+        function: card-resolver
+      render: native
   trigger:
     - key: pull-request-events
       function: on-pull-request
@@ -16,12 +32,19 @@ modules:
       handler: index.onPullRequest
     - key: settings-resolver
       handler: index.settingsResolver
+    - key: on-merge-check
+      handler: index.onMergeCheck
+    - key: card-resolver
+      handler: index.cardResolver
 resources:
   - key: settings
     path: src/frontend/settings.tsx
+  - key: card
+    path: src/frontend/card.tsx
 permissions:
   scopes:
     - read:pullrequest:bitbucket
+    - read:repository:bitbucket
     - write:pullrequest:bitbucket
     - storage:app
   external:

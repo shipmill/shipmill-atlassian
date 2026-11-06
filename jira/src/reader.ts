@@ -13,7 +13,7 @@ import {
   type Release,
   type WorkItem,
 } from '@shipmill-atlassian/shared/release';
-import type { JiraRest } from './jira-rest';
+import type { IssueRest, JiraRest } from './jira-rest';
 
 // The release reader: a fix version to its work items, with their comments, links, owners
 // and the pull requests the bridge linked to them
@@ -58,6 +58,23 @@ export async function readRelease(
     items.push(await workItem(rest, pullRequests, issue, `issues[${index}]`));
   }
   return { project, version, items };
+}
+
+// One work item and its fix versions, for the pull request a Bitbucket check is looking at
+export async function readWorkItem(
+  rest: JiraRest,
+  issues: IssueRest,
+  pullRequests: PullRequestLookup,
+  key: JiraKey,
+): Promise<{ item: WorkItem; fixVersions: string[] } | undefined> {
+  const raw = await issues.issue(key, [...FIELDS, 'fixVersions']);
+  if (raw === undefined) return undefined;
+  const issue = object(raw, `issue(${key})`);
+  const fields = object(issue.fields, `issue(${key}).fields`);
+  const fixVersions = list(fields.fixVersions, `issue(${key}).fields.fixVersions`, (value, path) =>
+    nonEmpty(object(value, path).name, `${path}.name`),
+  );
+  return { item: await workItem(rest, pullRequests, issue, `issue(${key})`), fixVersions };
 }
 
 async function workItem(rest: JiraRest, pullRequests: PullRequestLookup, issue: Fields, path: string): Promise<WorkItem> {
