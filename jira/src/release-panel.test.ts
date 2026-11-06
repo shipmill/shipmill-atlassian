@@ -5,7 +5,7 @@ import { NEEDS_DECISION, commentId, type Release } from '@shipmill-atlassian/sha
 import { askDecisions } from './ask';
 import { FakeJira, LEAD } from './fake-jira';
 import { seedRelease } from './fixtures';
-import { findDecisions, type Decision } from './finder';
+import { findDecisions, pullRequestDecisions, type Decision } from './finder';
 import { templatePreparer } from './prepare';
 import { relayPullRequestReply } from './pull-request-decision';
 import { relayReply } from './relay';
@@ -55,7 +55,7 @@ async function askedSeed(): Promise<{ release: Release; jira: FakeJira }> {
 
 test('on the seed the panel lists the three decisions oldest first, who each waits on, and their pull requests', async () => {
   const { release, jira } = await askedSeed();
-  const panel = await releasePanel(release, jira);
+  const panel = await releasePanel(release, jira, []);
   assert.equal(panel.ready, false);
   assert.deepEqual(
     panel.decisions.map((decision) => [decision.key, decision.waitsOn.displayName, decision.askedAt]),
@@ -84,7 +84,7 @@ test('on the seed the panel shows ready to ship once the decisions are answered 
     assert.equal(outcome.relayed, true, `${key}: ${JSON.stringify(outcome)}`);
   }
   // Still blocked on HRB-2 alone
-  const midway = await releasePanel(relabelled(before, jira), jira);
+  const midway = await releasePanel(relabelled(before, jira), jira, []);
   assert.deepEqual(midway.decisions.map((decision) => decision.key), [HRB2]);
   assert.equal(midway.ready, false);
 
@@ -96,9 +96,28 @@ test('on the seed the panel shows ready to ship once the decisions are answered 
     { jira, reader: null, now },
   );
   assert.equal(outcome.relayed, true, JSON.stringify(outcome));
-  const after = await releasePanel(relabelled(before, jira), jira);
+  const after = await releasePanel(relabelled(before, jira), jira, []);
   assert.deepEqual(after.decisions, []);
   assert.equal(after.ready, true);
+});
+
+test('an open decision on a pull request keeps the panel blocked after the work items are answered', async () => {
+  const release = await seedRelease();
+  const clear: Release = { ...release, items: release.items.map((item) => ({ ...item, labels: [] })) };
+  const pullRequest = clear.items.find((item) => item.key === HRB2)!.pullRequests[0]!;
+  const onPullRequests = pullRequestDecisions(clear.items, [
+    { key: HRB2, pullRequest, open: [{ taskId: 7, question: 'Ship the v1 token shim behind a flag?' }] },
+  ]);
+  const blocked = await releasePanel(clear, new FakeJira(), onPullRequests);
+  assert.deepEqual(blocked.decisions, []);
+  assert.equal(blocked.ready, false);
+  assert.deepEqual(
+    blocked.pullRequestDecisions.map((decision) => [decision.key, decision.question, decision.pullRequest.url, decision.taskId]),
+    [[HRB2, 'Ship the v1 token shim behind a flag?', pullRequest.url, 7]],
+  );
+  // The task resolved: the next report drops it, and nothing blocks the release
+  const resolved = await releasePanel(clear, new FakeJira(), pullRequestDecisions(clear.items, []));
+  assert.equal(resolved.ready, true);
 });
 
 test('a labelled item not asked yet comes last, with the finder question and the person shipmill will ask', async () => {
@@ -111,7 +130,7 @@ test('a labelled item not asked yet comes last, with the finder question and the
     preparer: templatePreparer,
     now: ticking('2026-12-03T09:00:00.000Z'),
   });
-  const panel = await releasePanel(release, jira);
+  const panel = await releasePanel(release, jira, []);
   assert.deepEqual(
     panel.decisions.map((decision) => [decision.key, decision.askedAt === null]),
     [
@@ -131,7 +150,7 @@ test('a labelled item with nobody on it waits on the project lead, asked once', 
     items: release.items.map((item) => (item.key === HRB2 || item.key === HRB3 ? { ...item, owner: null, reporter: null } : item)),
   };
   const jira = new FakeJira();
-  const panel = await releasePanel(nobody, jira);
+  const panel = await releasePanel(nobody, jira, []);
   assert.deepEqual(
     panel.decisions.map((decision) => decision.waitsOn),
     [LEAD, LEAD],
@@ -142,8 +161,8 @@ test('a labelled item with nobody on it waits on the project lead, asked once', 
 test('a release with no labelled item is ready to ship', async () => {
   const release = await seedRelease();
   const clear: Release = { ...release, items: release.items.map((item) => ({ ...item, labels: [] })) };
-  const panel = await releasePanel(clear, new FakeJira());
-  assert.deepEqual(panel, { project: release.project, version: '2.4', decisions: [], ready: true });
+  const panel = await releasePanel(clear, new FakeJira(), []);
+  assert.deepEqual(panel, { project: release.project, version: '2.4', decisions: [], pullRequestDecisions: [], ready: true });
 });
 
 test('the picker offers the fix versions neither released nor archived, in Jira order', () => {

@@ -235,8 +235,9 @@ version, oldest first:
 
 A decision blocks while its work item is labelled `needs-decision`, as the merge check counts
 it, so the panel makes no LLM call. An item labelled but not asked yet shows the question the
-finder read and the person shipmill will ask, after the asked ones. With nothing left, the
-panel shows Ready to ship.
+finder read and the person shipmill will ask, after the asked ones. Below them come the
+decisions opened on pull requests (see the next section), each with its pull request and who
+it waits on. With nothing left in either list, the panel shows Ready to ship.
 
 ## A pull request's decision blocks the release
 
