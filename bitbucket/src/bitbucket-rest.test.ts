@@ -10,7 +10,11 @@ const BODY = {
   links: { html: { href: 'https://bitbucket.org/shipmill-dev/harbor/pull-requests/2' } },
   author: { account_id: '712020:sam', display_name: 'Sam Reyes', type: 'user' },
   source: { branch: { name: 'HRB-2-retire-v1-tokens' }, commit: { hash: '0123456789ab', type: 'commit' } },
-  destination: { branch: { name: 'main' }, commit: { hash: 'fedcba987654' } },
+  destination: {
+    branch: { name: 'main' },
+    commit: { hash: 'fedcba987654' },
+    repository: { full_name: 'shipmill-dev/harbor', name: 'Harbor', uuid: '{cd0fce65-d4df-4d6e-8f6d-cee7cbc7c6a2}' },
+  },
   participants: [
     { user: { account_id: '712020:dana', display_name: 'Dana Okafor' }, role: 'REVIEWER', approved: true, state: 'approved' },
   ],
@@ -21,6 +25,7 @@ test('reads a pull request with its head commit, destination and approvals', () 
     id: 2,
     title: 'HRB-2 Retire API v1 tokens',
     url: 'https://bitbucket.org/shipmill-dev/harbor/pull-requests/2',
+    repositorySlug: 'harbor',
     author: { accountId: '712020:sam', displayName: 'Sam Reyes' },
     sourceCommit: '0123456789ab',
     destinationBranch: 'main',
@@ -31,6 +36,14 @@ test('reads a pull request with its head commit, destination and approvals', () 
 
 test('a pull request without its head commit is refused', () => {
   assert.throws(() => parsePullRequest({ ...BODY, source: { branch: { name: 'x' } } }), ParseError);
+});
+
+test('names the repository by the slug in its full name, which is never just the workspace', () => {
+  assert.equal(parsePullRequest(BODY).repositorySlug, 'harbor');
+  const destination = (fullName: unknown) => ({ ...BODY, destination: { ...BODY.destination, repository: { full_name: fullName } } });
+  for (const fullName of ['harbor', 'shipmill-dev/harbor/x', '', undefined]) {
+    assert.throws(() => parsePullRequest(destination(fullName)), ParseError);
+  }
 });
 
 test('a build status without a name is named by its key; an unknown state is refused', () => {

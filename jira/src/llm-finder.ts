@@ -1,6 +1,7 @@
 import type { ChatResponse, Prompt } from '@forge/llm';
 import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { list, nonEmpty, object, string } from '@shipmill-atlassian/shared/parse';
+import { pullRequestLabel } from '@shipmill-atlassian/shared/pull-requests';
 import { logUsage, toolArguments } from './llm-tool';
 import { NEEDS_DECISION, commentId, type Release } from '@shipmill-atlassian/shared/release';
 import { ImplicitDecisionError, type ImplicitDecision, type ImplicitFinder } from './finder';
@@ -56,7 +57,7 @@ export function describeRelease(release: Release): string {
     lines.push(`Owner: ${person(item.owner)}. Reporter: ${person(item.reporter)}.`);
     if (item.description !== '') lines.push(`Description: ${item.description}`);
     for (const link of item.links) lines.push(`Link: ${link.relation} ${link.key} "${link.summary}" (${link.statusCategory})`);
-    for (const pr of item.pullRequests) lines.push(`Pull request: ${pr.repository} #${pr.id} "${pr.title}"`);
+    for (const pr of item.pullRequests) lines.push(`Pull request: ${pullRequestLabel(pr)} "${pr.title}"`);
     for (const comment of item.comments) {
       lines.push(`Comment ${comment.id} by ${person(comment.author)} at ${comment.created}: ${comment.text}`);
     }

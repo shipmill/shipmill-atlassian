@@ -20,13 +20,13 @@ export async function recordReport(
   message: Omit<PullRequestDecisions, 'kind' | 'sentAt'>,
   deps: { store: ReportStore; link: typeof rememberLinkedPullRequest },
 ): Promise<ReportOutcome> {
-  const { workspace, repository, id, title, url, open } = message;
+  const { workspace, repository, repositorySlug, id, title, url, open } = message;
   const key = findJiraKey(title);
   if (key === undefined || open.length === 0) {
     await deps.store.remove(workspace, repository, id);
     return { key: key ?? null, open: 0 };
   }
-  const pullRequest = { workspace, repository, id, title, url };
+  const pullRequest = { workspace, repository, repositorySlug, id, title, url };
   // A pull request opened before the apps were paired is linked by its first report
   await deps.link(key, pullRequest);
   await deps.store.set({ key, pullRequest, open });

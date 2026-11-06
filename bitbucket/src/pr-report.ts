@@ -34,8 +34,8 @@ export async function reportDecisions(
   pullRequest: PullRequest,
   tasks: readonly Task[],
 ): Promise<ReportOutcome> {
-  const { id, title, url } = pullRequest;
+  const { id, title, url, repositorySlug } = pullRequest;
   const question = await deps.store.get({ repository: deps.repository, id });
   const open = openDecisions(tasks, question);
-  return deps.report({ workspace: braced(deps.workspace), repository: braced(deps.repository), id, title, url, open });
+  return deps.report({ workspace: braced(deps.workspace), repository: braced(deps.repository), repositorySlug, id, title, url, open });
 }

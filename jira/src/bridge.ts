@@ -61,8 +61,8 @@ export async function onBridgeRequest(request: WebTriggerRequest): Promise<WebTr
 async function pullRequestOpened(message: PullRequestOpened): Promise<{ linked: boolean; key?: string }> {
   const key = findJiraKey(message.title);
   if (key === undefined) return { linked: false };
-  const { workspace, repository, id, title, url } = message;
-  await rememberLinkedPullRequest(key, { workspace, repository, id, title, url });
+  const { workspace, repository, repositorySlug, id, title, url } = message;
+  await rememberLinkedPullRequest(key, { workspace, repository, repositorySlug, id, title, url });
   const body = paragraphs([`shipmill: Bitbucket pull request #${message.id} "${message.title}" opened: ${message.url}`]);
   const response = await api.asApp().requestJira(route`/rest/api/3/issue/${key}/comment`, {
     method: 'POST',

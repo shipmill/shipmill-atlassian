@@ -27,12 +27,13 @@ export async function onPullRequest(event: PullRequestEvent): Promise<void> {
   const { id } = event.pullrequest;
   const questions = forgeQuestions(workspace, repository);
   const pullRequest = await questions.rest.pullRequest(id);
-  const { title, url } = pullRequest;
+  const { title, url, repositorySlug } = pullRequest;
   const answer = await sendToJira(paired, {
     kind: 'pullrequest-opened',
     sentAt: Date.now(),
     workspace,
     repository,
+    repositorySlug,
     id,
     title,
     url,
@@ -75,8 +76,8 @@ export async function onPullRequestDeclined(event: PullRequestEvent): Promise<vo
   if ((await pairing()) === undefined) return;
   const questions = forgeQuestions(event.workspace.uuid, event.repository.uuid);
   const { id } = event.pullrequest;
-  const { title, url } = await questions.rest.pullRequest(id);
-  const where = { workspace: braced(event.workspace.uuid), repository: braced(event.repository.uuid) };
+  const { title, url, repositorySlug } = await questions.rest.pullRequest(id);
+  const where = { workspace: braced(event.workspace.uuid), repository: braced(event.repository.uuid), repositorySlug };
   const outcome = await jiraReport({ ...where, id, title, url, open: [] });
   console.log(`pull request ${id} declined, decisions cleared: ${JSON.stringify(outcome)}`);
 }
