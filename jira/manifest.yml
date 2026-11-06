@@ -73,6 +73,11 @@ permissions:
     - read:jira-work
     - write:jira-work
     - storage:app
+    # Teamwork Graph: only the object types the preparer's queries traverse (jira/src/graph.ts)
+    - read:graph:issue:jira
+    - read:graph:pull-request:external
+    - read:graph:deployment:external
+    - read:graph:team:atlassian
 app:
   runtime:
     name: nodejs24.x

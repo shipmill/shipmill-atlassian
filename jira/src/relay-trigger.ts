@@ -6,7 +6,8 @@ import { commentId } from '@shipmill-atlassian/shared/release';
 import { askDecisions, type AskOutcome } from './ask';
 import { forgeDecisionJira } from './decision-jira';
 import { releaseDecisions } from './decisions';
-import { llmPreparer, templatePreparer } from './prepare';
+import { preparerGraph, type ConsumerContext } from './graph';
+import { llmPreparer, templatePreparer, withGraph } from './prepare';
 import { llmReplyReader, relayReply } from './relay';
 import { llmEnabled } from './settings';
 
@@ -42,14 +43,14 @@ export async function enqueuePrepare(project: string, version: string, llm: bool
   await prepareQueue.push({ body: { project, version, llm } });
 }
 
-export async function onPrepareRelease(event: { body: Record<string, unknown> }): Promise<AskOutcome[]> {
+export async function onPrepareRelease(event: { body: Record<string, unknown> }, context: ConsumerContext): Promise<AskOutcome[]> {
   const project = projectKey(nonEmpty(event.body.project, 'project'));
   const version = nonEmpty(event.body.version, 'version');
   const llm = boolean(event.body.llm, 'llm');
   const { release, decisions } = await releaseDecisions(project, version, llm);
   const outcomes = await askDecisions(release, decisions, {
     jira: forgeDecisionJira,
-    preparer: llm ? llmPreparer(chat) : templatePreparer,
+    preparer: withGraph(llm ? llmPreparer(chat) : templatePreparer, preparerGraph(context)),
     now: () => new Date(),
   });
   console.log(`prepare ${project} ${version} (llm ${llm}): ${JSON.stringify(outcomes)}`);
