@@ -11,6 +11,13 @@ import { forgeIssueRest, type IssueRest } from './jira-rest';
 // not grant does not fail a query, it empties it. So each object type is its own query (a
 // missing scope empties only its own list), and an empty list is reported with the scopes
 // it needed, never taken as "nothing linked" in silence.
+//
+// Apps can no longer send Cypher text: the graph refuses cypherQuery to new apps
+// (developer.atlassian.com/platform/teamwork-graph/migrate-from-raw-cypher/). The reads use
+// the curated queries instead (.../teamwork-graph/curated-queries/), which need no setup.
+// The catalog has none from a work item to its teams, and a persisted query (customQuery)
+// must first be registered for the app by a contributor, outside Forge; so the teams are
+// not read, and the log says so.
 
 export const PULL_REQUEST_STATUSES = ['DECLINED', 'DRAFT', 'MERGED', 'OPEN', 'UNKNOWN'] as const;
 export const DEPLOYMENT_STATES = ['CANCELLED', 'FAILED', 'IN_PROGRESS', 'PENDING', 'ROLLED_BACK', 'SUCCESSFUL', 'UNKNOWN'] as const;
@@ -30,25 +37,32 @@ export const QUERY_SCOPES: Record<GraphList, string[]> = {
   teams: ['read:graph:issue:jira', 'read:graph:team:atlassian'],
 };
 
-const CYPHER: Record<GraphList, string> = {
-  pullRequests: 'MATCH (item:JiraWorkItem {ari: $id})-[:content_entity_links_entity]->(found:ExternalPullRequest) RETURN found LIMIT 10',
-  deployments: 'MATCH (item:JiraWorkItem {ari: $id})-[:content_entity_links_entity]->(found:ExternalDeployment) RETURN found LIMIT 10',
-  teams: 'MATCH (found:AtlassianTeam)-[:atlassian_team_assigned_jira_work_item]->(item:JiraWorkItem {ari: $id}) RETURN found LIMIT 5',
+// The lists the graph is read for, and why the others are not
+export const READ_LISTS = ['pullRequests', 'deployments'] as const satisfies readonly GraphList[];
+export type ReadList = (typeof READ_LISTS)[number];
+export const UNREAD_LISTS: Record<Exclude<GraphList, ReadList>, string> = {
+  teams: 'the Teamwork Graph has no curated query from a work item to its teams, and no persisted query is registered for the app',
 };
 
-export const GRAPH_QUERY = `query shipmill_workItemGraph($cypherQuery: String!, $params: CypherRequestParams) {
-  cypherQuery(query: $cypherQuery, params: $params) {
-    edges { node { columns { key value {
-      __typename
-      ... on CypherQueryResultNode { id data {
-        __typename
-        ... on ExternalPullRequest { title url status }
-        ... on ExternalDeployment { displayName url state environment { displayName } }
-        ... on AtlassianTeam { displayName profileUrl }
-      } }
-    } } } }
+// Curated queries cap a page at 25; the first ten are evidence enough for one comment
+const PAGE = 10;
+
+// One curated query per list: its field, and the object type its edges carry
+const CURATED: Record<ReadList, { field: string; type: string; fields: string }> = {
+  pullRequests: { field: 'jiraWorkItemLinkedExternalPullRequests', type: 'ExternalPullRequest', fields: 'title url status' },
+  deployments: { field: 'jiraWorkItemLinkedExternalDeployments', type: 'ExternalDeployment', fields: 'displayName url state environment { displayName }' },
+};
+
+function curatedQuery(list: ReadList): string {
+  const { field, type, fields } = CURATED[list];
+  return `query shipmill_${field}($id: ID!) {
+  ${field}(id: $id, first: ${PAGE}) {
+    edges { node { __typename ... on ${type} { ${fields} } } }
   }
 }`;
+}
+
+export const GRAPH_QUERIES: Record<ReadList, string> = { pullRequests: curatedQuery('pullRequests'), deployments: curatedQuery('deployments') };
 
 // The transport: one GraphQL request to the Teamwork Graph, the response body as JSON
 export interface TeamworkGraph {
@@ -81,31 +95,23 @@ export function siteCloudId(installContext: string): string {
 }
 
 export async function readGraphEvidence(graph: TeamworkGraph, ari: string): Promise<GraphEvidence> {
-  const nodes = async (list: GraphList): Promise<Record<string, unknown>[]> =>
-    resultNodes(await graph.request(GRAPH_QUERY, { cypherQuery: CYPHER[list], params: { id: ari } }), `graph.${list}`);
-  const [pullRequests, deployments, teams] = await Promise.all([nodes('pullRequests'), nodes('deployments'), nodes('teams')]);
+  const nodes = async (list: ReadList): Promise<Record<string, unknown>[]> =>
+    resultNodes(await graph.request(GRAPH_QUERIES[list], { id: ari }), CURATED[list].field, `graph.${list}`);
+  const [pullRequests, deployments] = await Promise.all([nodes('pullRequests'), nodes('deployments')]);
   return {
     pullRequests: pullRequests.map((data, index) => pullRequest(data, `graph.pullRequests[${index}]`)),
     deployments: deployments.map((data, index) => deployment(data, `graph.deployments[${index}]`)),
-    teams: teams.map((data, index) => team(data, `graph.teams[${index}]`)),
+    teams: [],
   };
 }
 
-// The data of every node a cypherQuery returned. A GraphQL error fails the read: only an
-// empty list stands for a scope not granted.
-export function resultNodes(body: unknown, path: string): Record<string, unknown>[] {
+// The node on every edge of a curated query's connection. A GraphQL error fails the read:
+// only an empty list stands for a scope not granted.
+export function resultNodes(body: unknown, field: string, path: string): Record<string, unknown>[] {
   const fields = object(body, path);
   if (fields.errors !== undefined) throw new GraphError(`${path}: the Teamwork Graph answered with errors: ${JSON.stringify(fields.errors)}`);
-  const query = object(object(fields.data, `${path}.data`).cypherQuery, `${path}.data.cypherQuery`);
-  return array(query.edges, `${path}.edges`).flatMap((edge, row) => {
-    const columns = array(object(object(edge, `${path}.edges[${row}]`).node, `${path}.edges[${row}].node`).columns, `${path}.edges[${row}].columns`);
-    return columns.map((column, index) => {
-      const at = `${path}.edges[${row}].columns[${index}]`;
-      const value = object(object(column, at).value, `${at}.value`);
-      if (value.__typename !== 'CypherQueryResultNode') throw new ParseError(`${at}.value`, `is a ${String(value.__typename)}, not a node`);
-      return object(value.data, `${at}.value.data`);
-    });
-  });
+  const connection = object(object(fields.data, `${path}.data`)[field], `${path}.data.${field}`);
+  return array(connection.edges, `${path}.edges`).map((edge, row) => object(object(edge, `${path}.edges[${row}]`).node, `${path}.edges[${row}].node`));
 }
 
 function typed(data: Record<string, unknown>, path: string, name: string): void {
@@ -125,11 +131,6 @@ function deployment(data: Record<string, unknown>, path: string): GraphDeploymen
     url: nonEmpty(data.url, `${path}.url`),
     state: oneOf(data.state, `${path}.state`, DEPLOYMENT_STATES),
   };
-}
-
-function team(data: Record<string, unknown>, path: string): GraphTeam {
-  typed(data, path, 'AtlassianTeam');
-  return { name: nonEmpty(data.displayName, `${path}.displayName`), url: string(data.profileUrl, `${path}.profileUrl`) };
 }
 
 // The preparer's view: the graph's evidence for a work item, or why there is none. An
@@ -153,7 +154,7 @@ export function siteGraph(graph: TeamworkGraph, issues: IssueRest, cloudId: stri
       const issue = await issues.issue(key, ['summary']);
       if (issue === undefined) throw new GraphError(`${key} is not on the site`);
       const evidence = await readGraphEvidence(graph, workItemAri(cloudId, nonEmpty(object(issue, key).id, `${key}.id`)));
-      const empty = (Object.keys(QUERY_SCOPES) as GraphList[]).filter((list) => evidence[list].length === 0);
+      const empty = READ_LISTS.filter((list) => evidence[list].length === 0);
       return { status: 'read', evidence, empty };
     },
   };

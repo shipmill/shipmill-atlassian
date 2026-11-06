@@ -4,7 +4,7 @@ import type { JiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { list, nonEmpty, object } from '@shipmill-atlassian/shared/parse';
 import type { Person, Release, WorkItem } from '@shipmill-atlassian/shared/release';
 import type { Decision } from './finder';
-import { QUERY_SCOPES, type GraphEvidence, type GraphLookup, type WorkItemGraph } from './graph';
+import { QUERY_SCOPES, UNREAD_LISTS, type GraphEvidence, type GraphLookup, type WorkItemGraph } from './graph';
 import { describeRelease, MODEL, type Chat } from './llm-finder';
 import { logUsage, toolArguments } from './llm-tool';
 
@@ -214,16 +214,18 @@ export function graphEvidence(graph: GraphEvidence): string | undefined {
 }
 
 // What the graph read for one item, for the log: every empty list names the scopes it
-// needed, since an ungranted scope empties a query instead of failing it
+// needed, since an ungranted scope empties a query instead of failing it, and every list
+// not read says why
 export function graphNotes(key: JiraKey, item: WorkItem, lookup: GraphLookup): string[] {
   if (lookup.status === 'unavailable') return [`graph ${key}: not read, ${lookup.reason}`];
-  return lookup.empty.map((list) => {
+  const unread = Object.entries(UNREAD_LISTS).map(([list, reason]) => `graph ${key}: ${list} not read, ${reason}`);
+  return [...lookup.empty.map((list) => {
     const scopes = QUERY_SCOPES[list].join(', ');
     if (list === 'pullRequests' && item.pullRequests.length > 0) {
       return `graph ${key}: no pull requests, yet Bitbucket links ${item.pullRequests.length}; check that an admin granted ${scopes}`;
     }
     return `graph ${key}: no ${list}; either none is linked or ${scopes} is not granted`;
-  });
+  }), ...unread];
 }
 
 export function withGraph(preparer: Preparer, graph: WorkItemGraph, log: (line: string) => void = console.log): Preparer {

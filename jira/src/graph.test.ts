@@ -5,12 +5,13 @@ import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { ParseError } from '@shipmill-atlassian/shared/parse';
 import type { Release } from '@shipmill-atlassian/shared/release';
 import { askDecisions } from './ask';
+import { queuedText } from './ask-queued';
 import { frameText } from './comment';
 import { FakeJira } from './fake-jira';
 import { seedRelease } from './fixtures';
 import { findDecisions, type Decision } from './finder';
 import {
-  GRAPH_QUERY,
+  GRAPH_QUERIES,
   GraphError,
   carriedGraph,
   parseGraphLookups,
@@ -27,9 +28,9 @@ import { graphForAsk, graphFound } from './panel-ask';
 import type { IssueRest } from './jira-rest';
 import { templatePreparer, withGraph } from './prepare';
 
-// Graph responses in the shape the Teamwork Graph documents for cypherQuery, for the seed's
-// HRB-2 (issue id 10002). An item or object type with no file answers empty, as a scope
-// the admin did not grant does.
+// Graph responses in the shape the Teamwork Graph documents for its curated queries, for the
+// seed's HRB-2 (issue id 10002). An item or object type with no file answers an empty
+// connection, as a scope the admin did not grant does.
 
 const CLOUD = '0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9';
 const NOW = () => new Date('2026-12-03T09:00:00.000Z');
@@ -39,30 +40,35 @@ function load(name: string): unknown {
   return JSON.parse(readFileSync(new URL(name, DIRECTORY), 'utf8'));
 }
 
-const OBJECT_FILES: [RegExp, string][] = [
-  [/ExternalPullRequest/, 'pull-requests'],
-  [/ExternalDeployment/, 'deployments'],
-  [/AtlassianTeam/, 'teams'],
+// The curated field each query reads, and the fixture name of what it returns
+const FIELD_FILES: [string, string][] = [
+  ['jiraWorkItemLinkedExternalPullRequests', 'pull-requests'],
+  ['jiraWorkItemLinkedExternalDeployments', 'deployments'],
 ];
 
 class RecordedGraph implements TeamworkGraph {
-  readonly calls: { query: string; cypher: string; id: string }[] = [];
+  readonly calls: { query: string; id: string }[] = [];
 
   constructor(
     readonly recorded: Map<string, string>,
-    readonly answer: (file: string | undefined) => unknown = (file) => load(file ?? 'empty.json'),
+    readonly answer: (file: string | undefined, field: string) => unknown = (file, field) =>
+      file === undefined ? { data: { [field]: { edges: [] } } } : load(file),
   ) {}
 
   async request(query: string, variables: Record<string, unknown>): Promise<unknown> {
-    const cypher = variables.cypherQuery as string;
-    const id = (variables.params as { id: string }).id;
-    this.calls.push({ query, cypher, id });
-    const kind = OBJECT_FILES.find(([pattern]) => pattern.test(cypher))?.[1];
-    if (kind === undefined) throw new Error(`no recorded kind for ${cypher}`);
+    assert.deepEqual(Object.keys(variables), ['id']);
+    const id = variables.id as string;
+    this.calls.push({ query, id });
+    const found = FIELD_FILES.find(([field]) => query.includes(`${field}(id: $id, first: 10)`));
+    if (found === undefined) throw new Error(`no recorded field in ${query}`);
     const item = this.recorded.get(id);
-    return this.answer(item === undefined ? undefined : `${item}-${kind}.json`);
+    return this.answer(item === undefined ? undefined : `${item}-${found[1]}.json`, found[0]);
   }
 }
+
+// The teams have no curated query, so every read item logs why they were not read
+const TEAMS_UNREAD = (key: string): string =>
+  `graph ${key}: teams not read, the Teamwork Graph has no curated query from a work item to its teams, and no persisted query is registered for the app`;
 
 // HRB-2 has every file; HRB-3 and HRB-4 none
 const SEED_GRAPH = new Map([[workItemAri(CLOUD, '10002'), 'HRB-2']]);
@@ -79,16 +85,17 @@ async function seedDecisions(): Promise<{ release: Release; decisions: Decision[
   return { release, decisions: await findDecisions(release, { llm: false, implicit: { find: async () => [] } }) };
 }
 
-test('the graph reads pull requests, deployments and teams for a work item, each in its own query', async () => {
+test('the graph reads pull requests and deployments for a work item, each through its own curated query', async () => {
   const graph = new RecordedGraph(SEED_GRAPH);
   const evidence = await readGraphEvidence(graph, workItemAri(CLOUD, '10002'));
   assert.deepEqual(evidence, {
     pullRequests: [{ title: 'HRB-2 Rejects API v1 tokens with a pointer to the migration guide', url: 'https://bitbucket.org/shipmill-dev/harbor/pull-requests/2', status: 'OPEN' }],
     deployments: [{ name: 'harbor #41', environment: 'Staging', url: 'https://bitbucket.org/shipmill-dev/harbor/deployments/41', state: 'SUCCESSFUL' }],
-    teams: [{ name: 'Harbor API', url: 'https://shipmill-dev.atlassian.net/people/team/harbor-api' }],
+    teams: [],
   });
-  assert.equal(graph.calls.length, 3);
-  assert.ok(graph.calls.every((call) => call.query === GRAPH_QUERY && call.id === `ari:cloud:jira:${CLOUD}:issue/10002`));
+  assert.deepEqual(graph.calls.map((call) => call.query).sort(), Object.values(GRAPH_QUERIES).sort());
+  assert.ok(graph.calls.every((call) => call.id === `ari:cloud:jira:${CLOUD}:issue/10002`));
+  assert.ok(graph.calls.every((call) => !call.query.includes('cypherQuery')), 'the graph refuses Cypher text from the app');
 });
 
 test('the prepared comment on a seeded decision cites the graph evidence and who may decide', async () => {
@@ -103,10 +110,9 @@ test('the prepared comment on a seeded decision cites the graph evidence and who
     evidence,
     'Evidence: asked in the description of HRB-2: "Decision needed: retire v1 tokens in 2.4, or keep them for one more release? Fourteen customers still call the API with a v1 token every week."; ' +
       'in the Teamwork Graph, pull request "HRB-2 Rejects API v1 tokens with a pointer to the migration guide" (open, https://bitbucket.org/shipmill-dev/harbor/pull-requests/2); ' +
-      'deployment harbor #41 to Staging (successful, https://bitbucket.org/shipmill-dev/harbor/deployments/41); ' +
-      'assigned to team Harbor API, who may decide too',
+      'deployment harbor #41 to Staging (successful, https://bitbucket.org/shipmill-dev/harbor/deployments/41)',
   );
-  assert.deepEqual(lines, []);
+  assert.deepEqual(lines, [TEAMS_UNREAD('HRB-2')]);
 });
 
 test('without the graph the prepared comment is unchanged, and the log says why', async () => {
@@ -133,7 +139,7 @@ test('an empty graph never passes in silence: each empty list names its scopes, 
   assert.deepEqual(lines, [
     `graph HRB-3: no pull requests, yet Bitbucket links ${item.pullRequests.length}; check that an admin granted read:graph:issue:jira, read:graph:pull-request:external`,
     'graph HRB-3: no deployments; either none is linked or read:graph:issue:jira, read:graph:deployment:external is not granted',
-    'graph HRB-3: no teams; either none is linked or read:graph:issue:jira, read:graph:team:atlassian is not granted',
+    TEAMS_UNREAD('HRB-3'),
   ]);
 });
 
@@ -149,8 +155,10 @@ test('asking a seeded release with the graph posts the graph evidence only where
 test('a GraphQL error fails the read instead of passing for an empty graph', async () => {
   const graph = new RecordedGraph(SEED_GRAPH, () => load('errors.json'));
   await assert.rejects(readGraphEvidence(graph, workItemAri(CLOUD, '10002')), GraphError);
-  const odd = new RecordedGraph(SEED_GRAPH, () => ({ data: { cypherQuery: { edges: [{ node: { columns: [{ key: 'found', value: { __typename: 'CypherQueryResultIntObject' } }] } }] } } }));
+  const odd = new RecordedGraph(SEED_GRAPH, (_file, field) => ({ data: { [field]: { edges: [{ node: { __typename: 'JiraWorkItem', key: 'HRB-2' } }] } } }));
   await assert.rejects(readGraphEvidence(odd, workItemAri(CLOUD, '10002')), ParseError);
+  const refused = new RecordedGraph(SEED_GRAPH, (_file, field) => ({ data: { [field]: null } }));
+  await assert.rejects(readGraphEvidence(refused, workItemAri(CLOUD, '10002')), ParseError);
 });
 
 test('the graph is read only where the prepare runs for a user', async () => {
@@ -203,7 +211,7 @@ test('the graph the panel read reaches the comment through the queue, with no us
   await askDecisions(release, decisions, { jira: queued, preparer: withGraph(templatePreparer, graph, (line) => lines.push(line)), now: NOW });
   for (const key of [jiraKey('HRB-2'), jiraKey('HRB-3')]) assert.deepEqual(queued.posted(key).map((entry) => entry.text), direct.posted(key).map((entry) => entry.text));
   assert.match(queued.posted(jiraKey('HRB-2'))[0]!.text, /in the Teamwork Graph, pull request "HRB-2 Rejects API v1 tokens/);
-  assert.ok(lines.every((line) => line.startsWith('graph HRB-3: ')), 'only HRB-3 has empty lists to explain');
+  assert.ok(lines.filter((line) => line !== TEAMS_UNREAD('HRB-2')).every((line) => line.startsWith('graph HRB-3: ')), 'only HRB-3 has empty lists to explain');
 });
 
 test('without graph scopes or results, the comment from the panel is unchanged and the log says why', async () => {
@@ -230,4 +238,10 @@ test('a malformed graph in the queue event fails the prepare', () => {
   assert.throws(() => parseGraphLookups({ 'HRB-2': { status: 'read', evidence: { pullRequests: [], deployments: [], teams: [] }, empty: ['commits'] } }, 'graph'), ParseError);
   assert.throws(() => parseGraphLookups({ 'HRB-2': { status: 'read', evidence: { pullRequests: [{ title: 't', url: 'u', status: 'open' }], deployments: [], teams: [] }, empty: [] } }, 'graph'), ParseError);
   assert.throws(() => parseGraphLookups({ 'HRB-2': { status: 'unavailable', reason: '' } }, 'graph'), ParseError);
+});
+
+test('the panel says there was nothing new to ask when the graph was read for no item, not that it had no evidence', () => {
+  assert.equal(queuedText({ version: '2.4', asked: [], graphRead: [] }), 'Nothing new to ask in 2.4: every open decision already waits on an answer.');
+  assert.match(queuedText({ version: '2.4', asked: ['HRB-21'], graphRead: [] }), /The Teamwork Graph had no evidence to cite\.$/);
+  assert.match(queuedText({ version: '2.4', asked: ['HRB-2', 'HRB-3'], graphRead: ['HRB-2'] }), /The comments cite the Teamwork Graph on HRB-2\.$/);
 });
