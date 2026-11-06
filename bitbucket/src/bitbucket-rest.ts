@@ -12,6 +12,8 @@ export type PullRequest = {
   id: number;
   title: string;
   url: string;
+  // The slug of the repository the pull request is in, which labels it in Jira
+  repositorySlug: string;
   author: Account;
   // The head commit of the source branch, which the build must be green on
   sourceCommit: string;
@@ -60,6 +62,15 @@ function commitOf(side: unknown, path: string): { branch: string; commit: string
   };
 }
 
+// full_name is "<workspace slug>/<repository slug>"
+function repositorySlug(side: unknown, path: string): string {
+  const repository = object(object(side, path).repository, `${path}.repository`);
+  const fullName = nonEmpty(repository.full_name, `${path}.repository.full_name`);
+  const slug = /^[^/]+\/([^/]+)$/.exec(fullName)?.[1];
+  if (slug === undefined) throw new ParseError(`${path}.repository.full_name`, `not "<workspace>/<repository>": ${JSON.stringify(fullName)}`);
+  return slug;
+}
+
 export function parsePullRequest(value: unknown, path = 'pullrequest'): PullRequest {
   const fields = object(value, path);
   const source = commitOf(fields.source, `${path}.source`);
@@ -68,6 +79,7 @@ export function parsePullRequest(value: unknown, path = 'pullrequest'): PullRequ
     id: natural(fields.id, `${path}.id`),
     title: nonEmpty(fields.title, `${path}.title`),
     url: nonEmpty(object(object(fields.links, `${path}.links`).html, `${path}.links.html`).href, `${path}.links.html.href`),
+    repositorySlug: repositorySlug(fields.destination, `${path}.destination`),
     author: account(fields.author, `${path}.author`),
     sourceCommit: source.commit,
     destinationBranch: destination.branch,

@@ -10,7 +10,7 @@ import { recordReport, reportKey, reportsFor } from './pull-request-report';
 
 const WORKSPACE = '{4c16a397-8e48-479c-8ca2-442e46c90570}';
 const REPOSITORY = '{15a31549-1cff-45dc-9d0d-310114c5038b}';
-const PR1 = { workspace: WORKSPACE, repository: REPOSITORY, id: 1, title: 'HRB-1 Adds a CSV export to the invoice list', url: 'https://bitbucket.org/shipmill-dev/harbor/pull-requests/1' };
+const PR1 = { workspace: WORKSPACE, repository: REPOSITORY, repositorySlug: 'harbor', id: 1, title: 'HRB-1 Adds a CSV export to the invoice list', url: 'https://bitbucket.org/shipmill-dev/harbor/pull-requests/1' };
 const QUESTION = { taskId: 41, question: 'export every column, or only the visible ones?' };
 
 // The seed release once HRB-2 and HRB-3 are decided and HRB-4's question is asked and answered:

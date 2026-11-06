@@ -3,6 +3,7 @@
     {
       "workspace": "shipmill-dev",
       "repository": "harbor",
+      "repositorySlug": "harbor",
       "id": 1,
       "title": "HRB-1 Adds a CSV export to the invoice list",
       "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/1"
@@ -12,6 +13,7 @@
     {
       "workspace": "shipmill-dev",
       "repository": "harbor",
+      "repositorySlug": "harbor",
       "id": 2,
       "title": "HRB-2 Rejects API v1 tokens with a pointer to the migration guide",
       "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/2"
@@ -21,6 +23,7 @@
     {
       "workspace": "shipmill-dev",
       "repository": "harbor",
+      "repositorySlug": "harbor",
       "id": 3,
       "title": "HRB-3 Serves the new pricing page behind the new-pricing flag",
       "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/3"
@@ -30,6 +33,7 @@
     {
       "workspace": "shipmill-dev",
       "repository": "harbor",
+      "repositorySlug": "harbor",
       "id": 4,
       "title": "HRB-4 Adds the migration that splits line items out of invoices",
       "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/4"
@@ -39,6 +43,7 @@
     {
       "workspace": "shipmill-dev",
       "repository": "harbor",
+      "repositorySlug": "harbor",
       "id": 5,
       "title": "HRB-5 Retries failed webhooks with exponential backoff",
       "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/5"
@@ -48,6 +53,7 @@
     {
       "workspace": "shipmill-dev",
       "repository": "harbor",
+      "repositorySlug": "harbor",
       "id": 6,
       "title": "HRB-6 Renders PDF due dates in the account time zone",
       "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/6"
@@ -57,6 +63,7 @@
     {
       "workspace": "shipmill-dev",
       "repository": "harbor",
+      "repositorySlug": "harbor",
       "id": 7,
       "title": "HRB-7 Uses the name index for customer search",
       "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/7"
@@ -66,6 +73,7 @@
     {
       "workspace": "shipmill-dev",
       "repository": "harbor",
+      "repositorySlug": "harbor",
       "id": 8,
       "title": "HRB-8 Moves the runtime and CI to Node 24",
       "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/8"

@@ -12,6 +12,7 @@ const PULL_REQUEST: PullRequest = {
   id: 2,
   title: 'HRB-2 Retire API v1 tokens',
   url: 'https://bitbucket.org/shipmill-dev/harbor/pull-requests/2',
+  repositorySlug: 'harbor',
   author: SAM,
   sourceCommit: '0123456789abcdef',
   destinationBranch: 'main',
