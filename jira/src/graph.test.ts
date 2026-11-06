@@ -12,14 +12,18 @@ import { findDecisions, type Decision } from './finder';
 import {
   GRAPH_QUERY,
   GraphError,
+  carriedGraph,
+  parseGraphLookups,
   preparerGraph,
   readGraphEvidence,
   siteCloudId,
   siteGraph,
   unavailableGraph,
   workItemAri,
+  type GraphLookups,
   type TeamworkGraph,
 } from './graph';
+import { graphForAsk, graphFound } from './panel-ask';
 import type { IssueRest } from './jira-rest';
 import { templatePreparer, withGraph } from './prepare';
 
@@ -65,7 +69,8 @@ const SEED_GRAPH = new Map([[workItemAri(CLOUD, '10002'), 'HRB-2']]);
 
 const ISSUE_IDS: IssueRest = {
   async issue(key) {
-    return { id: { 'HRB-2': '10002', 'HRB-3': '10003', 'HRB-4': '10004' }[key as string], key };
+    // HRB-2 is 10002, as on the seed
+    return { id: String(10000 + Number(key.split('-')[1])), key };
   },
 };
 
@@ -157,4 +162,72 @@ test('the graph is read only where the prepare runs for a user', async () => {
   assert.equal(siteCloudId(site), CLOUD);
   assert.throws(() => siteCloudId('ari:cloud:bitbucket::workspace/x'), GraphError);
   assert.throws(() => workItemAri(CLOUD, 'HRB-2'), GraphError);
+});
+
+// "Ask decisions" on the release panel: the resolver reads the graph as the user, and the
+// prepare consumer, which runs for no user, cites what came in the queue event
+
+async function carriedThroughQueue(lookups: GraphLookups): Promise<GraphLookups> {
+  // The event body is JSON on the queue
+  return parseGraphLookups(JSON.parse(JSON.stringify(lookups)), 'graph');
+}
+
+test('the panel reads the graph for the labelled items not asked yet, and for every item with the LLM on', async () => {
+  const release = await seedRelease();
+  const graph = new RecordedGraph(SEED_GRAPH);
+  const lookups = await graphForAsk(release, false, new FakeJira(), siteGraph(graph, ISSUE_IDS, CLOUD));
+  assert.deepEqual(Object.keys(lookups).sort(), ['HRB-2', 'HRB-3']);
+  assert.deepEqual(graphFound(lookups), ['HRB-2']);
+
+  const jira = new FakeJira();
+  const { decisions } = await seedDecisions();
+  await askDecisions(release, decisions.filter((decision) => decision.key === 'HRB-2'), { jira, preparer: templatePreparer, now: NOW });
+  const afterAsked = await graphForAsk(release, false, jira, siteGraph(new RecordedGraph(SEED_GRAPH), ISSUE_IDS, CLOUD));
+  assert.deepEqual(Object.keys(afterAsked), ['HRB-3'], 'HRB-2 waits on an answer, so it is not asked again');
+
+  const withLlm = await graphForAsk(release, true, new FakeJira(), siteGraph(new RecordedGraph(SEED_GRAPH), ISSUE_IDS, CLOUD));
+  assert.deepEqual(Object.keys(withLlm).sort(), release.items.map((item) => item.key).sort());
+});
+
+test('the graph the panel read reaches the comment through the queue, with no user on the consumer', async () => {
+  const { release, decisions } = await seedDecisions();
+  const lookups = await graphForAsk(release, false, new FakeJira(), siteGraph(new RecordedGraph(SEED_GRAPH), ISSUE_IDS, CLOUD));
+  const carried = await carriedThroughQueue(lookups);
+  assert.deepEqual(carried, lookups);
+
+  const direct = new FakeJira();
+  await askDecisions(release, decisions, { jira: direct, preparer: withGraph(templatePreparer, siteGraph(new RecordedGraph(SEED_GRAPH), ISSUE_IDS, CLOUD), () => {}), now: NOW });
+  const queued = new FakeJira();
+  const lines: string[] = [];
+  const graph = preparerGraph({ installContext: `ari:cloud:jira::site/${CLOUD}` }, carried);
+  await askDecisions(release, decisions, { jira: queued, preparer: withGraph(templatePreparer, graph, (line) => lines.push(line)), now: NOW });
+  for (const key of [jiraKey('HRB-2'), jiraKey('HRB-3')]) assert.deepEqual(queued.posted(key).map((entry) => entry.text), direct.posted(key).map((entry) => entry.text));
+  assert.match(queued.posted(jiraKey('HRB-2'))[0]!.text, /in the Teamwork Graph, pull request "HRB-2 Rejects API v1 tokens/);
+  assert.ok(lines.every((line) => line.startsWith('graph HRB-3: ')), 'only HRB-3 has empty lists to explain');
+});
+
+test('without graph scopes or results, the comment from the panel is unchanged and the log says why', async () => {
+  const { release, decisions } = await seedDecisions();
+  // A scope the admin did not grant empties every query
+  const lookups = await carriedThroughQueue(await graphForAsk(release, false, new FakeJira(), siteGraph(new RecordedGraph(new Map()), ISSUE_IDS, CLOUD)));
+  assert.deepEqual(graphFound(lookups), []);
+  const plain = new FakeJira();
+  await askDecisions(release, decisions, { jira: plain, preparer: templatePreparer, now: NOW });
+  const queued = new FakeJira();
+  const lines: string[] = [];
+  await askDecisions(release, decisions, { jira: queued, preparer: withGraph(templatePreparer, carriedGraph(lookups), (line) => lines.push(line)), now: NOW });
+  for (const key of [jiraKey('HRB-2'), jiraKey('HRB-3')]) assert.deepEqual(queued.posted(key).map((entry) => entry.text), plain.posted(key).map((entry) => entry.text));
+  assert.ok(lines.includes('graph HRB-2: no deployments; either none is linked or read:graph:issue:jira, read:graph:deployment:external is not granted'));
+
+  const unread = await carriedGraph({}).lookup(jiraKey('HRB-2'));
+  assert.equal(unread.status, 'unavailable');
+  const noUser = await graphForAsk(release, false, new FakeJira(), unavailableGraph('the panel was opened by no user'));
+  assert.deepEqual(await carriedGraph(await carriedThroughQueue(noUser)).lookup(jiraKey('HRB-2')), { status: 'unavailable', reason: 'the panel was opened by no user' });
+});
+
+test('a malformed graph in the queue event fails the prepare', () => {
+  assert.throws(() => parseGraphLookups([], 'graph'), ParseError);
+  assert.throws(() => parseGraphLookups({ 'HRB-2': { status: 'read', evidence: { pullRequests: [], deployments: [], teams: [] }, empty: ['commits'] } }, 'graph'), ParseError);
+  assert.throws(() => parseGraphLookups({ 'HRB-2': { status: 'read', evidence: { pullRequests: [{ title: 't', url: 'u', status: 'open' }], deployments: [], teams: [] }, empty: [] } }, 'graph'), ParseError);
+  assert.throws(() => parseGraphLookups({ 'HRB-2': { status: 'unavailable', reason: '' } }, 'graph'), ParseError);
 });

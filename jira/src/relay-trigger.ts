@@ -6,7 +6,7 @@ import { commentId } from '@shipmill-atlassian/shared/release';
 import { askDecisions, type AskOutcome } from './ask';
 import { forgeDecisionJira } from './decision-jira';
 import { releaseDecisions } from './decisions';
-import { preparerGraph, type ConsumerContext } from './graph';
+import { parseGraphLookups, preparerGraph, type ConsumerContext, type GraphLookups } from './graph';
 import { llmPreparer, templatePreparer, withGraph } from './prepare';
 import { llmReplyReader, relayReply } from './relay';
 import { llmEnabled } from './settings';
@@ -39,18 +39,21 @@ export async function onRelayReply(event: { body: Record<string, unknown> }): Pr
   console.log(`relay ${key} comment ${reply}: ${JSON.stringify(outcome)}`);
 }
 
-export async function enqueuePrepare(project: string, version: string, llm: boolean): Promise<void> {
-  await prepareQueue.push({ body: { project, version, llm } });
+// The graph, where given, is what the release panel read as the user who pressed "Ask
+// decisions"; the dev trigger gives none
+export async function enqueuePrepare(project: string, version: string, llm: boolean, graph?: GraphLookups): Promise<void> {
+  await prepareQueue.push({ body: graph === undefined ? { project, version, llm } : { project, version, llm, graph } });
 }
 
 export async function onPrepareRelease(event: { body: Record<string, unknown> }, context: ConsumerContext): Promise<AskOutcome[]> {
   const project = projectKey(nonEmpty(event.body.project, 'project'));
   const version = nonEmpty(event.body.version, 'version');
   const llm = boolean(event.body.llm, 'llm');
+  const carried = event.body.graph === undefined ? undefined : parseGraphLookups(event.body.graph, 'graph');
   const { release, decisions } = await releaseDecisions(project, version, llm);
   const outcomes = await askDecisions(release, decisions, {
     jira: forgeDecisionJira,
-    preparer: withGraph(llm ? llmPreparer(chat) : templatePreparer, preparerGraph(context)),
+    preparer: withGraph(llm ? llmPreparer(chat) : templatePreparer, preparerGraph(context, carried)),
     now: () => new Date(),
   });
   console.log(`prepare ${project} ${version} (llm ${llm}): ${JSON.stringify(outcomes)}`);
