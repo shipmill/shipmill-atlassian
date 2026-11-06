@@ -6,14 +6,14 @@ Bitbucket app holds pull requests on the same decisions. Built for Codegeist 202
 
 Work in progress: the apps pair with each other, the Jira app reads a release, finds its
 decisions, asks each one on its work item and relays the answer, and the Bitbucket app asks
-the same decisions on pull requests and checks pull requests against them; there is no
-release panel yet.
+the same decisions on pull requests and checks pull requests against them, and the release
+panel shows what a fix version still waits on.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `jira/` | The Jira app: the bridge web trigger, the admin page, the release reader, the decision finder, the preparer and the relay |
+| `jira/` | The Jira app: the bridge web trigger, the admin page, the release reader, the decision finder, the preparer, the relay and the release panel |
 | `jira/evals/` | The decision finder's eval set and its runner |
 | `bitbucket/` | The Bitbucket app: pull request events, decisions on pull requests, the merge check, the pull request card and the workspace settings page |
 | `shared/` | Code both apps use: the signed bridge protocol, Jira keys, comment bodies |
@@ -197,6 +197,21 @@ the task resolves, so the merge check passes. A reply without a number, with the
 gets a note on the pull request asking for one. An answer given in Jira instead resolves the
 task the next time the pull request is opened, edited or checked. Anyone else's comment never
 counts.
+
+## The release panel
+
+Each project gets a page, Release decisions, in its sidebar: Forge offers no module on Jira's
+release page itself, so the panel opens on the project's first fix version that is neither
+released nor archived, with a picker for the others. It lists the decisions blocking that
+version, oldest first:
+
+- the work item, the question shipmill asked and when, and who it waits on
+- the item's pull requests in Bitbucket, where the same question can be answered
+
+A decision blocks while its work item is labelled `needs-decision`, as the merge check counts
+it, so the panel makes no LLM call. An item labelled but not asked yet shows the question the
+finder read and the person shipmill will ask, after the asked ones. With nothing left, the
+panel shows Ready to ship.
 
 ## Privacy
 
