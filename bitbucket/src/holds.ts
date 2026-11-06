@@ -24,7 +24,12 @@ export type HoldKind = 'work-item' | 'decision' | 'build' | 'breaking';
 export type Hold = { kind: HoldKind; message: string; waitsOn: string };
 
 // shipmill's way of asking on a pull request: a task "Decision needed: <question>"
+export const DECISION_TASK_PREFIX = 'Decision needed: ';
 const DECISION_TASK = /^\s*Decision needed:\s*(.+)$/is;
+
+function oneLine(text: string): string {
+  return text.replaceAll(/\s+/g, ' ').trim();
+}
 
 function short(commit: string): string {
   return commit.slice(0, 12);
@@ -49,10 +54,12 @@ export function holds(facts: Facts): Hold[] {
       found.push({ kind: 'decision', message: `${workItem.key} waits on a decision: ${question}`, waitsOn: decider });
     }
   }
+  // shipmill asks the work item's decision on its pull requests too: that task is the same hold
+  const onItem = new Set(workItem?.found === true ? workItem.openDecisions.map(oneLine) : []);
   for (const task of facts.tasks) {
     const asked = DECISION_TASK.exec(task.text)?.[1];
-    if (task.state === 'UNRESOLVED' && asked !== undefined) {
-      found.push({ kind: 'decision', message: `this pull request waits on a decision: ${asked.replaceAll(/\s+/g, ' ').trim()}`, waitsOn: decider });
+    if (task.state === 'UNRESOLVED' && asked !== undefined && !onItem.has(oneLine(asked))) {
+      found.push({ kind: 'decision', message: `this pull request waits on a decision: ${oneLine(asked)}`, waitsOn: decider });
     }
   }
 

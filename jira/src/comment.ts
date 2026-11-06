@@ -1,5 +1,8 @@
+import { optionLine } from '@shipmill-atlassian/shared/decision';
 import type { Person } from '@shipmill-atlassian/shared/release';
-import type { DecisionOption, Prepared } from './prepare';
+import type { Prepared } from './prepare';
+
+export { optionLine };
 
 // The comments shipmill posts on a work item, as Jira's ADF. They follow shipmill's
 // needs-decision protocol line for line (skills/github-issue-triage/references/
@@ -31,10 +34,6 @@ function paragraph(...content: Inline[]): Paragraph {
 
 function at(person: Person): string {
   return `@${person.displayName}`;
-}
-
-export function optionLine(option: DecisionOption, index: number): string {
-  return index === 0 ? `${option.text} (recommended): ${option.reason}` : `${option.text}: ${option.reason}`;
 }
 
 function replyLine(prepared: Prepared): string {
@@ -82,14 +81,15 @@ export function frameText(prepared: Prepared): string {
   ].join('\n');
 }
 
-// The record of who decided: the login in a code span, so the record doesn't notify them
-export function relayComment(decider: Person, answer: string): Adf {
+// The record of who decided: the login in a code span, so the record doesn't notify them.
+// where says where the answer was given: "in Jira", or on a pull request.
+export function relayComment(decider: Person, answer: string, where = 'in Jira'): Adf {
   return {
     type: 'doc',
     version: 1,
     content: [
       paragraph(text('Decision by '), text(at(decider), [{ type: 'code' }]), text(`, relayed by ${AGENT}`)),
-      paragraph(text(`Answered in Jira: ${answer}`)),
+      paragraph(text(`Answered ${where}: ${answer}`)),
     ],
   };
 }

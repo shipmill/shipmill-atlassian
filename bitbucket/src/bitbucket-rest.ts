@@ -25,7 +25,9 @@ export type BuildState = (typeof BUILD_STATES)[number];
 export type BuildStatus = { key: string; name: string; state: BuildState };
 
 export const TASK_STATES = ['RESOLVED', 'UNRESOLVED'] as const;
-export type Task = { state: (typeof TASK_STATES)[number]; text: string };
+export type Task = { id: number; state: (typeof TASK_STATES)[number]; text: string };
+
+export type PullRequestComment = { id: number; author: Account; text: string };
 
 export interface BitbucketRest {
   pullRequest(id: number): Promise<PullRequest>;
@@ -33,6 +35,16 @@ export interface BitbucketRest {
   tasks(pullRequest: number): Promise<Task[]>;
   // A file's text at a commit, or undefined when the commit has no such file
   file(commit: string, path: string): Promise<string | undefined>;
+}
+
+// The writes that ask a decision on a pull request and record its answer, all as the app
+export interface BitbucketWrites {
+  comment(pullRequest: number, id: number): Promise<PullRequestComment>;
+  // Posts a Markdown comment and gives its id
+  postComment(pullRequest: number, markdown: string): Promise<number>;
+  // Opens a task on a comment and gives its id
+  createTask(pullRequest: number, text: string, comment: number): Promise<number>;
+  resolveTask(pullRequest: number, task: number): Promise<void>;
 }
 
 function account(value: unknown, path: string): Account {
@@ -77,7 +89,17 @@ export function parseStatus(value: unknown, path: string): BuildStatus {
 export function parseTask(value: unknown, path: string): Task {
   const fields = object(value, path);
   return {
+    id: natural(fields.id, `${path}.id`),
     state: oneOf(fields.state, `${path}.state`, TASK_STATES),
+    text: string(object(fields.content, `${path}.content`).raw, `${path}.content.raw`),
+  };
+}
+
+export function parseComment(value: unknown, path: string): PullRequestComment {
+  const fields = object(value, path);
+  return {
+    id: natural(fields.id, `${path}.id`),
+    author: account(fields.user, `${path}.user`),
     text: string(object(fields.content, `${path}.content`).raw, `${path}.content.raw`),
   };
 }
@@ -127,8 +149,16 @@ async function allPages<T>(first: Route, what: string, item: (value: unknown, pa
   return found;
 }
 
-export function forgeBitbucket(workspace: string, repository: string): BitbucketRest {
+const JSON_HEADERS = { 'Content-Type': 'application/json', Accept: 'application/json' };
+
+function created(value: unknown, what: string): number {
+  return natural(object(value, what).id, `${what}.id`);
+}
+
+export function forgeBitbucket(workspace: string, repository: string): BitbucketRest & BitbucketWrites {
   const base = route`/2.0/repositories/${workspace}/${repository}`;
+  const send = async (path: Route, method: 'POST' | 'PUT', body: object, what: string): Promise<unknown> =>
+    json(await api.asApp().requestBitbucket(path, { method, headers: JSON_HEADERS, body: JSON.stringify(body) }), what);
   return {
     async pullRequest(id) {
       const what = `reading pull request ${id}`;
@@ -145,6 +175,23 @@ export function forgeBitbucket(workspace: string, repository: string): Bitbucket
       if (response.status === 404) return undefined;
       if (!response.ok) throw new Error(`reading ${path} at ${commit} failed: ${response.status} ${await response.text()}`);
       return response.text();
+    },
+    async comment(pullRequest, id) {
+      const what = `reading comment ${id} on pull request ${pullRequest}`;
+      return parseComment(await json(await api.asApp().requestBitbucket(route`${base}/pullrequests/${pullRequest}/comments/${id}`), what), what);
+    },
+    async postComment(pullRequest, markdown) {
+      const what = `commenting on pull request ${pullRequest}`;
+      return created(await send(route`${base}/pullrequests/${pullRequest}/comments`, 'POST', { content: { raw: markdown } }, what), what);
+    },
+    async createTask(pullRequest, text, comment) {
+      const what = `opening a task on pull request ${pullRequest}`;
+      const body = { content: { raw: text }, comment: { id: comment } };
+      return created(await send(route`${base}/pullrequests/${pullRequest}/tasks`, 'POST', body, what), what);
+    },
+    async resolveTask(pullRequest, task) {
+      const what = `resolving task ${task} on pull request ${pullRequest}`;
+      await send(route`${base}/pullrequests/${pullRequest}/tasks/${task}`, 'PUT', { state: 'RESOLVED' }, what);
     },
   };
 }
