@@ -9,6 +9,7 @@ import { decisionView, relayPullRequestReply } from './pull-request-decision';
 import { kvsReports, recordReport } from './pull-request-report';
 import { kvsPullRequests, rememberLinkedPullRequest } from './pull-request-store';
 import { llmReplyReader } from './relay';
+import { queuedDecisionLog } from './relay-trigger';
 import { bridgeSecret, llmEnabled } from './settings';
 import { workItemStatus } from './work-item';
 
@@ -51,7 +52,7 @@ export async function onBridgeRequest(request: WebTriggerRequest): Promise<WebTr
     case 'decision-reply': {
       // Read with the LLM only while the switch is on, as a reply in Jira is
       const reader = (await llmEnabled()) ? llmReplyReader(chat) : null;
-      const outcome = await relayPullRequestReply(message, { jira: forgeDecisionJira, reader, now: () => new Date() });
+      const outcome = await relayPullRequestReply(message, { jira: forgeDecisionJira, reader, now: () => new Date(), log: queuedDecisionLog });
       console.log(`relay ${message.key} reply on pull request ${message.pullRequest.id}: ${JSON.stringify(outcome)}`);
       return respond(200, outcome);
     }

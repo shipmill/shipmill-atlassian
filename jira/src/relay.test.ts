@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import type { Person } from '@shipmill-atlassian/shared/release';
 import { askDecisions } from './ask';
-import { FakeJira, toolResponse } from './fake-jira';
+import { FakeJira, FakeLog, toolResponse } from './fake-jira';
 import { seedRelease } from './fixtures';
 import { findDecisions } from './finder';
 import { templatePreparer } from './prepare';
@@ -44,7 +44,7 @@ test('reads an option number at the start of a reply only', () => {
 test('with the LLM off a number from the decider ends the wait: relay comment, label off, answer recorded', async () => {
   const jira = await asked();
   const reply = jira.reply(HRB2, DANA, '2');
-  const outcome = await relayReply(HRB2, reply, { jira, reader: null, now: NOW });
+  const outcome = await relayReply(HRB2, reply, { jira, reader: null, now: NOW, log: new FakeLog() });
   assert.deepEqual(outcome, { key: HRB2, relayed: true, answer: { kind: 'option', number: 2 } });
   const posted = jira.posted(HRB2);
   assert.equal(
@@ -67,14 +67,14 @@ test('with the LLM off a number from the decider ends the wait: relay comment, l
 
   // A second reply after the decision changes nothing
   const later = jira.reply(HRB2, DANA, '1');
-  assert.deepEqual(await relayReply(HRB2, later, { jira, reader: null, now: NOW }), { key: HRB2, relayed: false, reason: 'decided' });
+  assert.deepEqual(await relayReply(HRB2, later, { jira, reader: null, now: NOW, log: new FakeLog() }), { key: HRB2, relayed: false, reason: 'decided' });
 });
 
 test('with the LLM off free text gets a note and the question stays open', async () => {
   const jira = await asked();
   const before = jira.posted(HRB2).length;
   const reply = jira.reply(HRB2, DANA, 'Let us keep them one more release');
-  assert.deepEqual(await relayReply(HRB2, reply, { jira, reader: null, now: NOW }), { key: HRB2, relayed: false, reason: 'unread' });
+  assert.deepEqual(await relayReply(HRB2, reply, { jira, reader: null, now: NOW, log: new FakeLog() }), { key: HRB2, relayed: false, reason: 'unread' });
   assert.equal(jira.posted(HRB2).length, before + 1);
   assert.match(jira.posted(HRB2).at(-1)!.text, /Reply with a number from 1 to 3; the decision stays open/);
   assert.equal(jira.states.get(HRB2)?.status, 'waiting');
@@ -84,19 +84,19 @@ test('with the LLM off free text gets a note and the question stays open', async
 test('a question asked with the LLM off is relayed by number even when the switch is on now', async () => {
   const jira = await asked();
   const reply = jira.reply(HRB2, DANA, 'keep them');
-  const outcome = await relayReply(HRB2, reply, { jira, reader: NO_LLM, now: NOW });
+  const outcome = await relayReply(HRB2, reply, { jira, reader: NO_LLM, now: NOW, log: new FakeLog() });
   assert.deepEqual(outcome, { key: HRB2, relayed: false, reason: 'unread' });
 });
 
 test('only a newer comment by the person asked counts', async () => {
   const jira = await asked();
   const outsider = jira.reply(HRB2, OUTSIDER, '1');
-  assert.deepEqual(await relayReply(HRB2, outsider, { jira, reader: null, now: NOW }), { key: HRB2, relayed: false, reason: 'not-decider' });
+  assert.deepEqual(await relayReply(HRB2, outsider, { jira, reader: null, now: NOW, log: new FakeLog() }), { key: HRB2, relayed: false, reason: 'not-decider' });
   const question = jira.states.get(HRB2)!.questionId;
-  assert.deepEqual(await relayReply(HRB2, question, { jira, reader: null, now: NOW }), { key: HRB2, relayed: false, reason: 'not-newer' });
+  assert.deepEqual(await relayReply(HRB2, question, { jira, reader: null, now: NOW, log: new FakeLog() }), { key: HRB2, relayed: false, reason: 'not-newer' });
   const notAsked = jiraKey('HRB-5');
   const reply = jira.reply(notAsked, DANA, '1');
-  assert.deepEqual(await relayReply(notAsked, reply, { jira, reader: null, now: NOW }), { key: notAsked, relayed: false, reason: 'no-question' });
+  assert.deepEqual(await relayReply(notAsked, reply, { jira, reader: null, now: NOW, log: new FakeLog() }), { key: notAsked, relayed: false, reason: 'no-question' });
   assert.equal(jira.states.get(HRB2)?.status, 'waiting');
   assert.deepEqual(jira.labels, []);
 });
@@ -117,7 +117,7 @@ test('with the LLM on Claude reads a free-text reply as an option or the decider
     return toolResponse('read_reply', { kind: 'own', option: null, answer: 'Keep v1 tokens until 2.5 and email the fourteen customers.' });
   }, () => {});
   const reply = jira.reply(HRB2, DANA, 'Keep them until 2.5, and let us email those fourteen customers this week.');
-  const outcome = await relayReply(HRB2, reply, { jira, reader, now: NOW });
+  const outcome = await relayReply(HRB2, reply, { jira, reader, now: NOW, log: new FakeLog() });
   assert.deepEqual(outcome, { key: HRB2, relayed: true, answer: { kind: 'own', text: 'Keep v1 tokens until 2.5 and email the fourteen customers.' } });
   assert.equal(prompts.length, 1);
   assert.match(prompts[0]!, /1\. Move HRB-2 out of 2.4 \(recommended\)/);
@@ -129,14 +129,14 @@ test('with the LLM on Claude reads a free-text reply as an option or the decider
 test('with the LLM on a number is still read by code, and a reply that decides nothing keeps the wait quietly', async () => {
   const jira = await askedWithLlm();
   const numbered = jira.reply(HRB2, DANA, '1');
-  const byNumber = await relayReply(HRB2, numbered, { jira, reader: NO_LLM, now: NOW });
+  const byNumber = await relayReply(HRB2, numbered, { jira, reader: NO_LLM, now: NOW, log: new FakeLog() });
   assert.deepEqual(byNumber, { key: HRB2, relayed: true, answer: { kind: 'option', number: 1 } });
 
   const other = await askedWithLlm();
   const posted = other.posted(HRB2).length;
   const reader = llmReplyReader(async () => toolResponse('read_reply', { kind: 'none', option: null, answer: null }), () => {});
   const reply = other.reply(HRB2, DANA, 'Which customers are these?');
-  assert.deepEqual(await relayReply(HRB2, reply, { jira: other, reader, now: NOW }), { key: HRB2, relayed: false, reason: 'no-answer' });
+  assert.deepEqual(await relayReply(HRB2, reply, { jira: other, reader, now: NOW, log: new FakeLog() }), { key: HRB2, relayed: false, reason: 'no-answer' });
   assert.equal(other.posted(HRB2).length, posted);
 });
 
@@ -149,7 +149,7 @@ test('refuses an LLM reading out of shape', async () => {
   ]) {
     const reader = llmReplyReader(async () => toolResponse('read_reply', args), () => {});
     const reply = jira.reply(HRB2, DANA, 'something');
-    await assert.rejects(relayReply(HRB2, reply, { jira, reader, now: NOW }), (error) => error instanceof ReplyError || error instanceof Error);
+    await assert.rejects(relayReply(HRB2, reply, { jira, reader, now: NOW, log: new FakeLog() }), (error) => error instanceof ReplyError || error instanceof Error);
   }
   assert.equal(jira.states.get(HRB2)?.status, 'waiting');
 });

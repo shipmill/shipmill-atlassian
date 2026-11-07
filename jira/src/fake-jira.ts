@@ -4,6 +4,7 @@ import { commentId, type Comment, type CommentId, type Person } from '@shipmill-
 import { plainText } from '@shipmill-atlassian/shared/adf';
 import type { Adf } from './comment';
 import type { DecisionJira } from './decision-jira';
+import type { DecisionLog, LoggedDecision } from './decision-log';
 import { parseDecisionState, type DecisionState } from './decision-state';
 
 // An in-memory Jira for the preparer and relay tests. Tests only; the app never imports this.
@@ -76,4 +77,13 @@ export function toolResponse(name: string, args: object): ChatResponse {
     ],
     usage: { input_tokens: 900, output_tokens: 120 },
   };
+}
+
+// The decisions the relay handed to the Confluence log
+export class FakeLog implements DecisionLog {
+  readonly recorded: LoggedDecision[] = [];
+
+  async record(decision: LoggedDecision): Promise<void> {
+    this.recorded.push(decision);
+  }
 }

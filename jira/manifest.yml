@@ -39,6 +39,9 @@ modules:
     - key: prepare-consumer
       queue: prepare-releases
       function: on-prepare-release
+    - key: decision-log-consumer
+      queue: decision-log
+      function: on-decision-log
   # MCP: a coding agent lists a release's blocking decisions, asks one and reads its answer.
   # Tools are the actions below; an admin exposes them per site (see README, "Ask from a
   # coding agent through MCP"). Each runs for the caller and checks their Jira permissions.
@@ -126,6 +129,8 @@ modules:
     - key: on-prepare-release
       handler: index.onPrepareRelease
       timeoutSeconds: 600
+    - key: on-decision-log
+      handler: index.onDecisionLog
     - key: mcp-list-decisions
       handler: index.mcpListDecisions
     - key: mcp-ask-decision
@@ -142,6 +147,10 @@ permissions:
     - read:jira-work
     - write:jira-work
     - storage:app
+    # Confluence decision log (jira/src/confluence.ts): find the space, find, create and update its page
+    - read:space:confluence
+    - read:page:confluence
+    - write:page:confluence
     # Teamwork Graph: only the object types the preparer's queries traverse (jira/src/graph.ts)
     - read:graph:issue:jira
     - read:graph:pull-request:external

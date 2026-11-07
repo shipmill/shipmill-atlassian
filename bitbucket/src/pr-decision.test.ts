@@ -5,7 +5,7 @@ import { parseDecisionView, parseReplyOutcome } from '@shipmill-atlassian/shared
 import { jiraKey, type JiraKey } from '@shipmill-atlassian/shared/jira-key';
 import type { WorkItemStatus } from '@shipmill-atlassian/shared/work-item';
 import { askDecisions } from '../../jira/src/ask';
-import { FakeJira } from '../../jira/src/fake-jira';
+import { FakeJira, FakeLog } from '../../jira/src/fake-jira';
 import { seedRelease } from '../../jira/src/fixtures';
 import { findDecisions } from '../../jira/src/finder';
 import { templatePreparer } from '../../jira/src/prepare';
@@ -54,7 +54,7 @@ function bridged(jira: FakeJira): Decisions {
     async reply(reply) {
       const message = send({ kind: 'decision-reply', sentAt: NOW().getTime(), ...reply });
       if (message.kind !== 'decision-reply') throw new Error(`sent a decision reply, decoded ${message.kind}`);
-      return parseReplyOutcome(roundTrip(await relayPullRequestReply(message, { jira, reader: null, now: NOW })));
+      return parseReplyOutcome(roundTrip(await relayPullRequestReply(message, { jira, reader: null, now: NOW, log: new FakeLog() })));
     },
   };
 }
@@ -171,7 +171,7 @@ test('an answer given in Jira resolves the task on the pull request', async () =
   const { jira, rest, deps } = await seeded();
   await syncQuestion(deps, SEEDED);
   const reply = jira.reply(HRB2, DANA, '1');
-  assert.equal((await relayReply(HRB2, reply, { jira, reader: null, now: NOW })).relayed, true);
+  assert.equal((await relayReply(HRB2, reply, { jira, reader: null, now: NOW, log: new FakeLog() })).relayed, true);
 
   assert.equal(await syncQuestion(deps, SEEDED), 'resolved');
   assert.match(rest.posted(2).at(-1)!, /^Decision by `@Dana Okafor`, relayed by shipmill\n\nAnswered in Jira: option 1, Move HRB-2 out of 2.4/);
@@ -182,7 +182,7 @@ test('an answer given in Jira resolves the task on the pull request', async () =
 test('a reply on the pull request after Jira has the answer resolves the task there too', async () => {
   const { jira, rest, deps } = await seeded();
   await syncQuestion(deps, SEEDED);
-  await relayReply(HRB2, jira.reply(HRB2, DANA, '1'), { jira, reader: null, now: NOW });
+  await relayReply(HRB2, jira.reply(HRB2, DANA, '1'), { jira, reader: null, now: NOW, log: new FakeLog() });
   assert.equal(await relayPullRequestComment(deps, 2, rest.reply(2, DANA, '3')), 'decided');
   assert.deepEqual((await rest.tasks(2)).map((task) => task.state), ['RESOLVED']);
   // Jira kept the first answer

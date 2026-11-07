@@ -4,13 +4,14 @@ import { natural, nonEmpty, oneOf } from '@shipmill-atlassian/shared/parse';
 import type { CommentId } from '@shipmill-atlassian/shared/release';
 import { optionLine, relayComment, unreadComment } from './comment';
 import type { DecisionJira } from './decision-jira';
+import type { DecisionLog } from './decision-log';
 import { newer, type Answer, type DecisionState } from './decision-state';
 import { MODEL, type Chat } from './llm-finder';
 import { logUsage, toolArguments } from './llm-tool';
 
 // The relay: a reply by the person asked ends the wait. shipmill posts "Decision by `@x`,
 // relayed by shipmill" with the answer, removes the needs-decision label, and records the
-// answer. A reply that starts with an option number is read by code; with the LLM on,
+// answer, then hands it to the Confluence decision log. A reply that starts with an option number is read by code; with the LLM on,
 // Claude reads any other reply, and with it off such a reply gets a note and the question
 // stays open. Anyone else's comment, or one older than the question, never counts.
 
@@ -44,7 +45,7 @@ export type RelayOutcome =
 export async function relayReply(
   key: JiraKey,
   replyId: CommentId,
-  deps: { jira: DecisionJira; reader: ReplyReader | null; now: () => Date },
+  deps: { jira: DecisionJira; reader: ReplyReader | null; now: () => Date; log: DecisionLog },
 ): Promise<RelayOutcome> {
   const state = await deps.jira.state(key);
   if (state === undefined) return { key, relayed: false, reason: 'no-question' };
@@ -58,9 +59,13 @@ export async function relayReply(
     return { key, relayed: false, reason: 'unread' };
   }
   if (reading === 'no-answer') return { key, relayed: false, reason: 'no-answer' };
-  await deps.jira.postComment(key, relayComment(reply.author, answerText(state, reading)));
+  const answer = answerText(state, reading);
+  await deps.jira.postComment(key, relayComment(reply.author, answer));
   await deps.jira.label(key, false);
-  await deps.jira.setState(key, { ...state, status: 'decided', replyId, answer: reading, decidedAt: deps.now().toISOString() });
+  const decidedAt = deps.now().toISOString();
+  await deps.jira.setState(key, { ...state, status: 'decided', replyId, answer: reading, decidedAt });
+  // Only once the decision is recorded: the log never holds a decision Jira doesn't
+  await deps.log.record({ key, question: state.question, answer, decider: reply.author, decidedAt, replyId });
   return { key, relayed: true, answer: reading };
 }
 

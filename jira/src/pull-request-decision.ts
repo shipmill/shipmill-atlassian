@@ -3,6 +3,7 @@ import type { DecisionView, ReplyOutcome } from '@shipmill-atlassian/shared/deci
 import type { JiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { relayComment } from './comment';
 import type { DecisionJira } from './decision-jira';
+import type { DecisionLog } from './decision-log';
 import { answerText, readReply, type ReplyReader } from './relay';
 
 // The Jira side of a decision asked on a pull request. The Bitbucket app asks what the work
@@ -26,7 +27,7 @@ export async function decisionView(jira: DecisionJira, key: JiraKey): Promise<De
 
 export async function relayPullRequestReply(
   reply: DecisionReply,
-  deps: { jira: DecisionJira; reader: ReplyReader | null; now: () => Date },
+  deps: { jira: DecisionJira; reader: ReplyReader | null; now: () => Date; log: DecisionLog },
 ): Promise<ReplyOutcome> {
   const { key } = reply;
   const state = await deps.jira.state(key);
@@ -42,6 +43,8 @@ export async function relayPullRequestReply(
   const where = `on Bitbucket pull request #${reply.pullRequest.id} (${reply.pullRequest.url})`;
   const replyId = await deps.jira.postComment(key, relayComment(reply.author, answer, where));
   await deps.jira.label(key, false);
-  await deps.jira.setState(key, { ...state, status: 'decided', replyId, answer: reading, decidedAt: deps.now().toISOString() });
+  const decidedAt = deps.now().toISOString();
+  await deps.jira.setState(key, { ...state, status: 'decided', replyId, answer: reading, decidedAt });
+  await deps.log.record({ key, question: state.question, answer, decider: reply.author, decidedAt, replyId });
   return { relayed: true, answer };
 }
