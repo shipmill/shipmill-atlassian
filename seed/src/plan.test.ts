@@ -25,7 +25,7 @@ function seededJira(): JiraState {
   const items = new Map<string, ItemState>(
     ITEMS.map((item) => [
       item.id,
-      { key: keys.get(item.id) ?? '', labels: [...item.labels], fixVersions: [FIX_VERSION], comments: [], asked: false },
+      { key: keys.get(item.id) ?? '', labels: [...item.labels], fixVersions: [FIX_VERSION], asked: false },
     ]),
   );
   return { project: true, versions: new Set([FIX_VERSION]), items };
@@ -89,18 +89,17 @@ test('a half-seeded site plans only what is missing', () => {
   );
 });
 
-test('an answered decision is reset: record and comments cleared, label put back', () => {
-  // After a run: shipmill asked (property and question), the decider replied, the relay
-  // posted and removed the label
-  const state = withItem(seededJira(), 'retire-v1-tokens', { labels: [], comments: ['10001', '10002', '10003'], asked: true });
+test('an answered decision is reset: record cleared, label put back', () => {
+  // After a run: shipmill asked, the decider replied, the relay removed the label
+  const state = withItem(seededJira(), 'retire-v1-tokens', { labels: [], asked: true });
   assert.deepEqual(planJira(ITEMS, FIX_VERSION, state), [
-    { kind: 'clear-question', itemId: 'retire-v1-tokens', key: 'HRB-2', comments: ['10001', '10002', '10003'], asked: true },
+    { kind: 'clear-question', itemId: 'retire-v1-tokens', key: 'HRB-2' },
     { kind: 'reset-fields', itemId: 'retire-v1-tokens', key: 'HRB-2', labels: [DECISION_LABEL] },
   ]);
 });
 
 test('an asked but unanswered decision forgets the question, so the app asks it again', () => {
-  const state = withItem(seededJira(), 'pricing-page', { comments: ['10004'], asked: true });
+  const state = withItem(seededJira(), 'pricing-page', { asked: true });
   assert.deepEqual(
     planJira(ITEMS, FIX_VERSION, state).map((action) => action.kind),
     ['clear-question'],

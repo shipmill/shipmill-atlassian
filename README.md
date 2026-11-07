@@ -88,8 +88,9 @@ so every run, a judge's install and the video start from the same data:
 It reads what exists first and changes only what differs, so a second run changes nothing,
 and a run after a demo puts the release back:
 
-- a work item asked or answered loses shipmill's record (the `shipmill-decision` property)
-  and every comment on it, so the app asks it again; the seed itself posts no comments
+- a work item asked or answered loses shipmill's record (the `shipmill-decision` property),
+  so the app asks it again; its comments stay, since a reply counts only when it is newer
+  than the question it answers (and a person can't delete the app's comments)
 - labels and the fix version go back to the seed's, so a relayed decision gets its
   `needs-decision` label again and an item moved out of `2.4` moves back
 - the pull request decision task is reopened, and shipmill's own `Decision needed:` tasks
@@ -111,7 +112,7 @@ git-ignored; the shell wins over the file):
 | Variable | What |
 |---|---|
 | `ATLASSIAN_EMAIL` | The Atlassian account email both tokens belong to |
-| `JIRA_API_TOKEN` | A classic API token (Create API token, not the one with scopes) from id.atlassian.com, for a Jira admin: the seed creates a project and deletes comments and entity properties, and calls `<site>/rest/api/3`, which a scoped token can't |
+| `JIRA_API_TOKEN` | A classic API token (Create API token, not the one with scopes) from id.atlassian.com, for a Jira admin: the seed creates a project and deletes the app's entity property on its work items, and calls `<site>/rest/api/3`, which a scoped token can't |
 | `BITBUCKET_API_TOKEN` | An API token with scopes from id.atlassian.com, app Bitbucket, scopes `read:repository:bitbucket`, `write:repository:bitbucket`, `admin:repository:bitbucket` (creates the repository), `read:pullrequest:bitbucket`, `write:pullrequest:bitbucket` (pull requests and their tasks) |
 
 ```text

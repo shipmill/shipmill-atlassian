@@ -9,8 +9,6 @@ export type ItemState = {
   labels: readonly string[];
   // Names of its fix versions
   fixVersions: readonly string[];
-  // Ids of every comment on it: the seed posts none, so any comment is left from a run
-  comments: readonly string[];
   // Whether shipmill recorded a question on it (the shipmill-decision entity property)
   asked: boolean;
 };
@@ -30,8 +28,10 @@ export type JiraAction =
   // Labels and fix version back to the seed's, after a relay removed the label or someone
   // moved the item out of the release
   | { kind: 'reset-fields'; itemId: string; key: string; labels: readonly string[] }
-  // Forgets what shipmill asked: its property, its question, the reply and the relay
-  | { kind: 'clear-question'; itemId: string; key: string; comments: readonly string[]; asked: boolean };
+  // Forgets what shipmill asked, so it asks again. The property is the app's only marker: a
+  // reply counts only when it is newer than the question it names, so the old question,
+  // reply and relay comments stay (the app's comments can't be deleted by a person anyway)
+  | { kind: 'clear-question'; itemId: string; key: string };
 
 export function planJira(items: readonly SeedItem[], version: string, state: JiraState): JiraAction[] {
   assertUniqueIds(items);
@@ -48,8 +48,8 @@ export function planJira(items: readonly SeedItem[], version: string, state: Jir
       actions.push({ kind: 'create-item', item });
       continue;
     }
-    if (found.asked || found.comments.length > 0) {
-      actions.push({ kind: 'clear-question', itemId: item.id, key: found.key, comments: found.comments, asked: found.asked });
+    if (found.asked) {
+      actions.push({ kind: 'clear-question', itemId: item.id, key: found.key });
     }
     if (!sameSet(found.labels, item.labels) || !sameSet(found.fixVersions, [version])) {
       actions.push({ kind: 'reset-fields', itemId: item.id, key: found.key, labels: item.labels });
@@ -202,13 +202,8 @@ export function describeJira(action: JiraAction): string {
       return `create work item "${action.item.summary}"`;
     case 'reset-fields':
       return `reset ${action.key} to labels [${action.labels.join(', ')}] and the release's fix version`;
-    case 'clear-question': {
-      const parts = [
-        ...(action.asked ? ["shipmill's record of the question"] : []),
-        ...(action.comments.length > 0 ? [`${action.comments.length} comment(s)`] : []),
-      ];
-      return `clear ${action.key}: delete ${parts.join(' and ')}`;
-    }
+    case 'clear-question':
+      return `clear ${action.key}: delete shipmill's record of the question, so it is asked again`;
   }
 }
 

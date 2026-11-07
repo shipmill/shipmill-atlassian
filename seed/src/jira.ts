@@ -61,7 +61,7 @@ export class Jira {
       }
       // A work item deleted since is made again
       const issue = await this.#http.find(
-        `rest/api/3/issue/${text(id, `manifest ${item.id}`)}?fields=labels,fixVersions,comment&properties=${DECISION_PROPERTY}`,
+        `rest/api/3/issue/${text(id, `manifest ${item.id}`)}?fields=labels,fixVersions&properties=${DECISION_PROPERTY}`,
       );
       if (issue === undefined) {
         continue;
@@ -91,13 +91,7 @@ export class Jira {
         );
         return;
       case 'clear-question':
-        // The record first: once it is gone the app asks again, whatever comments are left
-        if (action.asked) {
-          await this.#http.delete(`rest/api/3/issue/${action.key}/properties/${DECISION_PROPERTY}`, [204]);
-        }
-        for (const comment of action.comments) {
-          await this.#http.delete(`rest/api/3/issue/${action.key}/comment/${comment}`, [204]);
-        }
+        await this.#http.delete(`rest/api/3/issue/${action.key}/properties/${DECISION_PROPERTY}`, [204]);
         return;
     }
   }
@@ -179,16 +173,11 @@ export class Jira {
   }
 }
 
-// A work item as GET issue returns it with labels, fix versions, comments and the decision property
+// A work item as GET issue returns it with labels, fix versions and the decision property
 export function itemState(issue: unknown): ItemState {
   const body = record(issue, 'work item');
   const key = text(body.key, 'work item key');
   const fields = record(body.fields, `${key} fields`);
-  const page = record(fields.comment, `${key} comments`);
-  const comments = list(page.comments, `${key} comments`);
-  if (page.total !== comments.length) {
-    throw new Error(`${key} has ${String(page.total)} comments but the response carries ${comments.length}`);
-  }
   const properties = body.properties === undefined ? {} : record(body.properties, `${key} properties`);
   return {
     key,
@@ -196,7 +185,6 @@ export function itemState(issue: unknown): ItemState {
     fixVersions: list(fields.fixVersions, `${key} fix versions`).map((version) =>
       text(record(version, `${key} fix version`).name, `${key} fix version name`),
     ),
-    comments: comments.map((comment) => text(record(comment, `${key} comment`).id, `${key} comment id`)),
     asked: DECISION_PROPERTY in properties,
   };
 }
