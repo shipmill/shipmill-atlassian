@@ -2,9 +2,10 @@ import type { Prompt } from '@forge/llm';
 import type { DecisionOption } from '@shipmill-atlassian/shared/decision';
 import type { JiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { list, nonEmpty, object } from '@shipmill-atlassian/shared/parse';
+import { linkedByUrl, pullRequestLabel, type LinkedPullRequest } from '@shipmill-atlassian/shared/pull-requests';
 import type { Person, Release, WorkItem } from '@shipmill-atlassian/shared/release';
 import type { Decision } from './finder';
-import { QUERY_SCOPES, UNREAD_LISTS, type GraphEvidence, type GraphLookup, type WorkItemGraph } from './graph';
+import { QUERY_SCOPES, UNREAD_LISTS, type GraphEvidence, type GraphLookup, type GraphPullRequest, type WorkItemGraph } from './graph';
 import { describeRelease, MODEL, type Chat } from './llm-finder';
 import { logUsage, toolArguments } from './llm-tool';
 
@@ -16,12 +17,21 @@ import { logUsage, toolArguments } from './llm-tool';
 
 export type { DecisionOption };
 
+// The evidence as text with links in it: the comment links a pull request by its label
+export type EvidenceLink = { text: string; url: string };
+export type EvidencePart = string | EvidenceLink;
+
+// As Markdown, the way shipmill writes it on GitHub
+export function evidenceText(parts: readonly EvidencePart[]): string {
+  return parts.map((part) => (typeof part === 'string' ? part : part.text === part.url ? part.url : `[${part.text}](${part.url})`)).join('');
+}
+
 export type Prepared = {
   key: JiraKey;
   question: string;
   // The recommended option first, as the protocol asks
   options: DecisionOption[];
-  evidence: string;
+  evidence: EvidencePart[];
   decider: Person;
   // Whether a free-text reply is read by Claude; with it off the reply is an option number
   llm: boolean;
@@ -91,7 +101,7 @@ export const templatePreparer: Preparer = {
       key: decision.key,
       question: decision.question,
       options: templateOptions(decision, release),
-      evidence: evidence(decision, item),
+      evidence: [evidence(decision, item)],
       decider,
       llm: false,
     };
@@ -188,7 +198,7 @@ export function llmPreparer(chat: Chat, log: (line: string) => void = console.lo
       const response = await chat(preparePrompt(decision, item, release));
       logUsage(log, `llm preparer ${decision.key}`, started, response);
       const { question, options } = parsePrepared(toolArguments(response, TOOL, (message) => new PrepareError(message)));
-      return { key: decision.key, question, options, evidence: evidence(decision, item), decider, llm: true };
+      return { key: decision.key, question, options, evidence: [evidence(decision, item)], decider, llm: true };
     },
   };
 }
@@ -203,14 +213,30 @@ function state(value: string): string {
   return STATE[value] ?? value.toLowerCase();
 }
 
-export function graphEvidence(graph: GraphEvidence): string | undefined {
-  const parts = [
-    ...graph.pullRequests.map((pr) => `pull request "${quote(pr.title)}" (${state(pr.status)}, ${pr.url})`),
-    ...graph.deployments.map((deploy) => `deployment ${deploy.name} to ${deploy.environment} (${state(deploy.state)}, ${deploy.url})`),
+export function hasGraphEvidence(graph: GraphEvidence): boolean {
+  return graph.pullRequests.length + graph.deployments.length + graph.teams.length > 0;
+}
+
+// A pull request is named the way the release panel names it, "harbor #5", linked to the
+// graph's URL. The graph's ExternalPullRequest has no repository name, only ids, and for
+// Bitbucket Cloud its URL names the workspace and repository by uuid; the label comes from
+// the pull request the bridge reported for the item. One the bridge never reported (another
+// provider, or reported before the bridge was installed) is linked by its URL as it is.
+function graphPullRequest(pr: GraphPullRequest, linked: readonly LinkedPullRequest[]): EvidencePart[] {
+  const known = linkedByUrl(linked, pr.url);
+  if (known === undefined) return [`pull request "${quote(pr.title)}" (${state(pr.status)}, `, { text: pr.url, url: pr.url }, ')'];
+  return ['pull request ', { text: pullRequestLabel(known), url: pr.url }, ` "${quote(pr.title)}" (${state(pr.status)})`];
+}
+
+export function graphEvidence(graph: GraphEvidence, linked: readonly LinkedPullRequest[]): EvidencePart[] | undefined {
+  const parts: EvidencePart[][] = [
+    ...graph.pullRequests.map((pr) => graphPullRequest(pr, linked)),
+    ...graph.deployments.map((deploy) => [`deployment ${deploy.name} to ${deploy.environment} (${state(deploy.state)}, `, { text: deploy.url, url: deploy.url }, ')']),
   ];
   const teams = graph.teams.map((team) => team.name);
-  if (teams.length > 0) parts.push(`assigned to ${teams.length === 1 ? 'team' : 'teams'} ${teams.join(', ')}, who may decide too`);
-  return parts.length === 0 ? undefined : `in the Teamwork Graph, ${parts.join('; ')}`;
+  if (teams.length > 0) parts.push([`assigned to ${teams.length === 1 ? 'team' : 'teams'} ${teams.join(', ')}, who may decide too`]);
+  if (parts.length === 0) return undefined;
+  return ['in the Teamwork Graph, ', ...parts.flatMap((part, index) => (index === 0 ? part : ['; ', ...part]))];
 }
 
 // What the graph read for one item, for the log: every empty list names the scopes it
@@ -233,8 +259,8 @@ export function withGraph(preparer: Preparer, graph: WorkItemGraph, log: (line: 
     async prepare(decision, item, release, decider) {
       const [prepared, lookup] = await Promise.all([preparer.prepare(decision, item, release, decider), graph.lookup(decision.key)]);
       for (const note of graphNotes(decision.key, item, lookup)) log(note);
-      const found = lookup.status === 'read' ? graphEvidence(lookup.evidence) : undefined;
-      return found === undefined ? prepared : { ...prepared, evidence: `${prepared.evidence}; ${found}` };
+      const found = lookup.status === 'read' ? graphEvidence(lookup.evidence, item.pullRequests) : undefined;
+      return found === undefined ? prepared : { ...prepared, evidence: [...prepared.evidence, '; ', ...found] };
     },
   };
 }

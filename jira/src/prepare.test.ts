@@ -8,7 +8,7 @@ import { MARKER, frameText, questionComment } from './comment';
 import { FakeJira, LEAD, toolResponse } from './fake-jira';
 import { seedRelease } from './fixtures';
 import { findDecisions, type Decision } from './finder';
-import { PrepareError, llmPreparer, templatePreparer, type Prepared } from './prepare';
+import { PrepareError, evidenceText, llmPreparer, templatePreparer, type Prepared } from './prepare';
 
 const NOW = () => new Date('2026-12-03T09:00:00.000Z');
 
@@ -109,7 +109,7 @@ test('with the LLM on Claude writes the question and options; the evidence and d
   assert.deepEqual(prompts[0]?.tool_choice, { type: 'function', function: { name: 'prepare_decision' } });
   assert.equal(prepared.llm, true);
   assert.equal(prepared.options[0]?.text, 'Run it in a separate maintenance window');
-  assert.match(prepared.evidence, /^asked by Seed Bot in a comment on .*, found by Claude: "Do we run this migration/);
+  assert.match(evidenceText(prepared.evidence), /^asked by Seed Bot in a comment on .*, found by Claude: "Do we run this migration/);
   assertFrame(frameText(prepared), true);
 });
 

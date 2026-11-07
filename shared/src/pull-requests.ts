@@ -32,6 +32,32 @@ export function remember(known: readonly LinkedPullRequest[], pullRequest: Linke
 
 const PULL_REQUEST_URL = /^https:\/\/bitbucket\.org\/[^/]+\/([^/]+)\/pull-requests\/(\d+)$/;
 
+// Bitbucket Cloud also names a pull request by its workspace's and repository's uuids, as the
+// Teamwork Graph's ExternalPullRequest.url does: https://bitbucket.org/{uuid}/{uuid}/pull-requests/5,
+// the braces as they are or percent-encoded
+const UUID_PULL_REQUEST_URL = /^https:\/\/bitbucket\.org\/(?:\{|%7B)([0-9a-f-]{36})(?:\}|%7D)\/(?:\{|%7B)([0-9a-f-]{36})(?:\}|%7D)\/pull-requests\/(\d+)$/i;
+
+function bareUuid(text: string): string | undefined {
+  return /^\{?([0-9a-f-]{36})\}?$/i.exec(text)?.[1]?.toLowerCase();
+}
+
+// The linked pull request a URL names: the one the bridge reported at that URL, or the one
+// with the same workspace, repository and id when the URL names them by uuid. undefined when
+// the bridge never reported it.
+export function linkedByUrl(known: readonly LinkedPullRequest[], url: string): LinkedPullRequest | undefined {
+  const exact = known.find((pullRequest) => pullRequest.url === url);
+  if (exact !== undefined) return exact;
+  const match = UUID_PULL_REQUEST_URL.exec(url);
+  if (match === null) return undefined;
+  const [, workspace, repository, id] = match;
+  return known.find(
+    (pullRequest) =>
+      pullRequest.id === Number(id) &&
+      bareUuid(pullRequest.workspace) === workspace!.toLowerCase() &&
+      bareUuid(pullRequest.repository) === repository!.toLowerCase(),
+  );
+}
+
 // Values stored before the bridge carried the slug have no repositorySlug field. They are
 // migrated from their own URL, which names the repository by the same slug; a URL that is
 // not that pull request's Bitbucket URL is an error, never a guess

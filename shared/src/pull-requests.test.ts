@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseLinkedPullRequest, parseLinkedPullRequests, pullRequestLabel, remember, type LinkedPullRequest } from './pull-requests';
+import { linkedByUrl, parseLinkedPullRequest, parseLinkedPullRequests, pullRequestLabel, remember, type LinkedPullRequest } from './pull-requests';
 
 const PR: LinkedPullRequest = { workspace: 'w', repository: '{cd0fce65-d4df-4d6e-8f6d-cee7cbc7c6a2}', repositorySlug: 'harbor', id: 1, title: 'KAN-1 One', url: 'https://bitbucket.org/w/harbor/pull-requests/1' };
 
@@ -40,4 +40,28 @@ test('migrates a value stored without a slug from its own URL, and refuses one i
   assert.throws(() => parseLinkedPullRequest({ ...legacy, url: 'https://bitbucket.org/w/harbor/pull-requests/9' }, 'stored'), /stored\.repositorySlug/);
   assert.throws(() => parseLinkedPullRequest({ ...legacy, url: 'https://example.com/harbor/1' }, 'stored'), /stored\.repositorySlug/);
   assert.throws(() => parseLinkedPullRequest({ ...PR, repositorySlug: '' }, 'stored'), /stored\.repositorySlug/);
+});
+
+// As the bridge reports it, and as the Teamwork Graph's ExternalPullRequest.url names it
+const WORKSPACE = 'fcb155cc-6f0e-4b4a-9d2e-0c7a1d3e5b21';
+const REPOSITORY = 'cd9fce65-d4df-4d6e-8f6d-cee7cbc7c6a2';
+const HARBOR_5: LinkedPullRequest = {
+  workspace: `{${WORKSPACE}}`,
+  repository: `{${REPOSITORY}}`,
+  repositorySlug: 'harbor',
+  id: 5,
+  title: 'HRB-5 Retry failed webhooks with backoff',
+  url: 'https://bitbucket.org/shipmill-dev/harbor/pull-requests/5',
+};
+
+test('finds the linked pull request a Bitbucket uuid URL names, braces as they are or encoded', () => {
+  assert.equal(linkedByUrl([PR, HARBOR_5], `https://bitbucket.org/{${WORKSPACE}}/{${REPOSITORY}}/pull-requests/5`), HARBOR_5);
+  assert.equal(linkedByUrl([PR, HARBOR_5], `https://bitbucket.org/%7B${WORKSPACE.toUpperCase()}%7D/%7B${REPOSITORY}%7D/pull-requests/5`), HARBOR_5);
+  assert.equal(linkedByUrl([PR, HARBOR_5], HARBOR_5.url), HARBOR_5);
+});
+
+test('a URL the bridge never reported names no linked pull request', () => {
+  assert.equal(linkedByUrl([HARBOR_5], `https://bitbucket.org/{${WORKSPACE}}/{${REPOSITORY}}/pull-requests/6`), undefined);
+  assert.equal(linkedByUrl([HARBOR_5], `https://bitbucket.org/{${WORKSPACE}}/{${WORKSPACE}}/pull-requests/5`), undefined);
+  assert.equal(linkedByUrl([HARBOR_5], 'https://github.com/shipmill-dev/harbor/pull/5'), undefined);
 });

@@ -206,8 +206,14 @@ what is linked to the work item: its pull requests and its deployments. What it 
 added to the question's evidence line:
 
 ```text
-Evidence: asked in the description of HRB-2: "..."; in the Teamwork Graph, pull request "HRB-2 Rejects API v1 tokens ..." (open, https://bitbucket.org/...); deployment harbor #41 to Staging (successful, https://bitbucket.org/...)
+Evidence: asked in the description of HRB-2: "..."; in the Teamwork Graph, pull request harbor #2 "HRB-2 Rejects API v1 tokens ..." (open); deployment harbor #41 to Staging (successful, https://bitbucket.org/...)
 ```
+
+A pull request reads as it does on the release panel, `harbor #2`, linked to the URL the
+graph gives. The graph's `ExternalPullRequest` carries no repository name, and for Bitbucket
+Cloud its URL names the workspace and repository by uuid, so the label comes from the pull
+request the Bitbucket app reported for the work item, matched by those uuids and the id. A
+pull request the Bitbucket app never reported is linked by its URL as it is.
 
 It reads them through the graph's
 [curated queries](https://developer.atlassian.com/platform/teamwork-graph/curated-queries/)
