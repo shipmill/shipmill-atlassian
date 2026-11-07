@@ -1,7 +1,7 @@
 import type { Release } from '@shipmill-atlassian/shared/release';
 import type { DecisionJira } from './decision-jira';
 import { labelledDecisions } from './finder';
-import { graphEvidence } from './prepare';
+import { hasGraphEvidence } from './prepare';
 import type { GraphLookups, WorkItemGraph } from './graph';
 
 // "Ask decisions" on the release panel: the resolver runs as the user who pressed it, the only
@@ -25,5 +25,5 @@ export async function graphForAsk(
 
 // The items the graph had any evidence on, for the panel to say so
 export function graphFound(lookups: GraphLookups): string[] {
-  return Object.entries(lookups).flatMap(([key, lookup]) => (lookup.status === 'read' && graphEvidence(lookup.evidence) !== undefined ? [key] : []));
+  return Object.entries(lookups).flatMap(([key, lookup]) => (lookup.status === 'read' && hasGraphEvidence(lookup.evidence) ? [key] : []));
 }

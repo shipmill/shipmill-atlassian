@@ -3,10 +3,11 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { ParseError } from '@shipmill-atlassian/shared/parse';
+import type { LinkedPullRequest } from '@shipmill-atlassian/shared/pull-requests';
 import type { Release } from '@shipmill-atlassian/shared/release';
 import { askDecisions } from './ask';
 import { queuedText } from './ask-queued';
-import { frameText } from './comment';
+import { frameText, questionComment } from './comment';
 import { FakeJira } from './fake-jira';
 import { seedRelease } from './fixtures';
 import { findDecisions, type Decision } from './finder';
@@ -26,7 +27,7 @@ import {
 } from './graph';
 import { graphForAsk, graphFound } from './panel-ask';
 import type { IssueRest } from './jira-rest';
-import { templatePreparer, withGraph } from './prepare';
+import { evidenceText, graphEvidence, templatePreparer, withGraph } from './prepare';
 
 // Graph responses in the shape the Teamwork Graph documents for its curated queries, for the
 // seed's HRB-2 (issue id 10002). An item or object type with no file answers an empty
@@ -109,7 +110,7 @@ test('the prepared comment on a seeded decision cites the graph evidence and who
   assert.equal(
     evidence,
     'Evidence: asked in the description of HRB-2: "Decision needed: retire v1 tokens in 2.4, or keep them for one more release? Fourteen customers still call the API with a v1 token every week."; ' +
-      'in the Teamwork Graph, pull request "HRB-2 Rejects API v1 tokens with a pointer to the migration guide" (open, https://bitbucket.org/shipmill-dev/harbor/pull-requests/2); ' +
+      'in the Teamwork Graph, pull request [harbor #2](https://bitbucket.org/shipmill-dev/harbor/pull-requests/2) "HRB-2 Rejects API v1 tokens with a pointer to the migration guide" (open); ' +
       'deployment harbor #41 to Staging (successful, https://bitbucket.org/shipmill-dev/harbor/deployments/41)',
   );
   assert.deepEqual(lines, [TEAMS_UNREAD('HRB-2')]);
@@ -135,7 +136,7 @@ test('an empty graph never passes in silence: each empty list names its scopes, 
   const preparer = withGraph(templatePreparer, siteGraph(new RecordedGraph(SEED_GRAPH), ISSUE_IDS, CLOUD), (line) => lines.push(line));
   const plain = await templatePreparer.prepare(decision, item, release, decision.askOf ?? release.items[0]!.reporter!);
   const prepared = await preparer.prepare(decision, item, release, decision.askOf ?? release.items[0]!.reporter!);
-  assert.equal(prepared.evidence, plain.evidence);
+  assert.deepEqual(prepared.evidence, plain.evidence);
   assert.deepEqual(lines, [
     `graph HRB-3: no pull requests, yet Bitbucket links ${item.pullRequests.length}; check that an admin granted read:graph:issue:jira, read:graph:pull-request:external`,
     'graph HRB-3: no deployments; either none is linked or read:graph:issue:jira, read:graph:deployment:external is not granted',
@@ -148,7 +149,7 @@ test('asking a seeded release with the graph posts the graph evidence only where
   const jira = new FakeJira();
   const preparer = withGraph(templatePreparer, siteGraph(new RecordedGraph(SEED_GRAPH), ISSUE_IDS, CLOUD), () => {});
   await askDecisions(release, decisions, { jira, preparer, now: NOW });
-  assert.match(jira.posted(jiraKey('HRB-2'))[0]!.text, /in the Teamwork Graph, pull request "HRB-2 Rejects API v1 tokens/);
+  assert.match(jira.posted(jiraKey('HRB-2'))[0]!.text, /in the Teamwork Graph, pull request harbor #2 "HRB-2 Rejects API v1 tokens/);
   assert.doesNotMatch(jira.posted(jiraKey('HRB-3'))[0]!.text, /Teamwork Graph/);
 });
 
@@ -210,7 +211,7 @@ test('the graph the panel read reaches the comment through the queue, with no us
   const graph = preparerGraph({ installContext: `ari:cloud:jira::site/${CLOUD}` }, carried);
   await askDecisions(release, decisions, { jira: queued, preparer: withGraph(templatePreparer, graph, (line) => lines.push(line)), now: NOW });
   for (const key of [jiraKey('HRB-2'), jiraKey('HRB-3')]) assert.deepEqual(queued.posted(key).map((entry) => entry.text), direct.posted(key).map((entry) => entry.text));
-  assert.match(queued.posted(jiraKey('HRB-2'))[0]!.text, /in the Teamwork Graph, pull request "HRB-2 Rejects API v1 tokens/);
+  assert.match(queued.posted(jiraKey('HRB-2'))[0]!.text, /in the Teamwork Graph, pull request harbor #2 "HRB-2 Rejects API v1 tokens/);
   assert.ok(lines.filter((line) => line !== TEAMS_UNREAD('HRB-2')).every((line) => line.startsWith('graph HRB-3: ')), 'only HRB-3 has empty lists to explain');
 });
 
@@ -244,4 +245,40 @@ test('the panel says there was nothing new to ask when the graph was read for no
   assert.equal(queuedText({ version: '2.4', asked: [], graphRead: [] }), 'Nothing new to ask in 2.4: every open decision already waits on an answer.');
   assert.match(queuedText({ version: '2.4', asked: ['HRB-21'], graphRead: [] }), /The Teamwork Graph had no evidence to cite\.$/);
   assert.match(queuedText({ version: '2.4', asked: ['HRB-2', 'HRB-3'], graphRead: ['HRB-2'] }), /The comments cite the Teamwork Graph on HRB-2\.$/);
+});
+
+// Bitbucket Cloud as the graph returns it live: the pull request's URL names the workspace and
+// the repository by uuid, and only the bridge knows the repository's slug
+const UUID_URL = 'https://bitbucket.org/{fcb155cc-6f0e-4b4a-9d2e-0c7a1d3e5b21}/{cd9fce65-d4df-4d6e-8f6d-cee7cbc7c6a2}/pull-requests/5';
+const HARBOR_5: LinkedPullRequest = {
+  workspace: '{fcb155cc-6f0e-4b4a-9d2e-0c7a1d3e5b21}',
+  repository: '{cd9fce65-d4df-4d6e-8f6d-cee7cbc7c6a2}',
+  repositorySlug: 'harbor',
+  id: 5,
+  title: 'HRB-5 Retry failed webhooks with backoff',
+  url: 'https://bitbucket.org/shipmill-dev/harbor/pull-requests/5',
+};
+const UUID_GRAPH = { pullRequests: [{ title: 'HRB-5 Retry failed webhooks with backoff', url: UUID_URL, status: 'OPEN' as const }], deployments: [], teams: [] };
+
+test('a pull request the graph names by Bitbucket uuids is cited by its label, linked to the graph URL', () => {
+  const parts = graphEvidence(UUID_GRAPH, [HARBOR_5])!;
+  assert.deepEqual(parts, ['in the Teamwork Graph, ', 'pull request ', { text: 'harbor #5', url: UUID_URL }, ' "HRB-5 Retry failed webhooks with backoff" (open)']);
+  assert.equal(evidenceText(parts), `in the Teamwork Graph, pull request [harbor #5](${UUID_URL}) "HRB-5 Retry failed webhooks with backoff" (open)`);
+});
+
+test('a pull request the bridge never reported is linked by the graph URL as it is', () => {
+  assert.equal(evidenceText(graphEvidence(UUID_GRAPH, [])!), `in the Teamwork Graph, pull request "HRB-5 Retry failed webhooks with backoff" (open, ${UUID_URL})`);
+});
+
+test('the ADF comment links the label, with no uuid in its text', async () => {
+  const { release, decisions } = await seedDecisions();
+  const decision = decisions[0]!;
+  const item = { ...release.items.find((candidate) => candidate.key === decision.key)!, pullRequests: [HARBOR_5] };
+  const graph = { lookup: async () => ({ status: 'read' as const, evidence: UUID_GRAPH, empty: [] }) };
+  const prepared = await withGraph(templatePreparer, graph, () => {}).prepare(decision, item, release, decision.askOf!);
+  const evidence = questionComment(prepared).content[2]!;
+  assert.equal(evidence.type, 'paragraph');
+  const inline = evidence.type === 'paragraph' ? evidence.content : [];
+  assert.ok(inline.some((node) => node.type === 'text' && node.text === 'harbor #5' && JSON.stringify(node.marks) === JSON.stringify([{ type: 'link', attrs: { href: UUID_URL } }])));
+  assert.ok(inline.every((node) => node.type !== 'text' || !node.text.includes('fcb155cc')), 'the text names no uuid');
 });

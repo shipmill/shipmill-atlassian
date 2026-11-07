@@ -1,6 +1,6 @@
 import { optionLine } from '@shipmill-atlassian/shared/decision';
 import type { Person } from '@shipmill-atlassian/shared/release';
-import type { Prepared } from './prepare';
+import { evidenceText, type Prepared } from './prepare';
 
 export { optionLine };
 
@@ -12,7 +12,7 @@ export { optionLine };
 // line lives in the work item's shipmill-decision property instead (see decision-state.ts),
 // and frameText gives the text with the marker, as shipmill would post it on GitHub.
 
-type Mark = { type: 'code' };
+type Mark = { type: 'code' } | { type: 'link'; attrs: { href: string } };
 type Inline =
   | { type: 'text'; text: string; marks?: Mark[] }
   | { type: 'mention'; attrs: { id: string; text: string } };
@@ -43,7 +43,15 @@ function replyLine(prepared: Prepared): string {
 }
 
 function evidenceLine(prepared: Prepared): string {
-  return `Evidence: ${prepared.evidence}`;
+  return `Evidence: ${evidenceText(prepared.evidence)}`;
+}
+
+// The evidence in ADF: its links as link marks, so a pull request reads as "harbor #5"
+function evidenceParagraph(prepared: Prepared): Paragraph {
+  return paragraph(
+    text('Evidence: '),
+    ...prepared.evidence.map((part) => (typeof part === 'string' ? text(part) : text(part.text, [{ type: 'link', attrs: { href: part.url } }]))),
+  );
 }
 
 // The question, with the decider mentioned so Jira notifies them: the question waits on them
@@ -61,7 +69,7 @@ export function questionComment(prepared: Prepared): Adf {
         attrs: { order: 1 },
         content: prepared.options.map((option, index) => ({ type: 'listItem', content: [paragraph(text(optionLine(option, index)))] })),
       },
-      paragraph(text(evidenceLine(prepared))),
+      evidenceParagraph(prepared),
       paragraph(text(replyLine(prepared))),
     ],
   };
