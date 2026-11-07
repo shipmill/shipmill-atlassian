@@ -74,25 +74,55 @@ Deploy each app from its folder with `forge deploy`.
 
 ## Seed a demo release
 
-`seed/` makes the release every stage is tested on, on a Jira site and a Bitbucket workspace
-you name:
+`seed/` puts a Jira site and a Bitbucket workspace you name into the demo's starting state,
+so every run, a judge's install and the video start from the same data:
 
 - Jira project `HRB` (Harbor) with fix version `2.4` and 20 work items in it
-- three blocking decisions: two work items labelled `needs-decision`, and one with a comment
-  that asks a question nobody answered
+- three blocking decisions labelled `needs-decision`, two of them with a pull request, each
+  asking "A, or B?" in its description so the template words the options with the LLM off
 - Bitbucket repository `harbor` with `shipmill.toml` and a README on the main branch, and
   eight pull requests whose titles start with the work item key (`HRB-2 Retire API v1 tokens`)
+- one of those pull requests carries its own decision: an open task `Decision needed: ...`
+  that the Bitbucket app reports to Jira once it reads the pull request
 
-It reads what exists first and makes only what is missing, so a second run changes nothing. A
-file on the main branch is written only while it is missing, never overwritten.
+It reads what exists first and changes only what differs, so a second run changes nothing,
+and a run after a demo puts the release back:
 
-Credentials come from the environment, never from arguments or files in the repo:
+- a work item asked or answered loses shipmill's record (the `shipmill-decision` property),
+  so the app asks it again; its comments stay, since a reply counts only when it is newer
+  than the question it answers (and a person can't delete the app's comments)
+- labels and the fix version go back to the seed's, so a relayed decision gets its
+  `needs-decision` label again and an item moved out of `2.4` moves back
+- the pull request decision task is reopened, and shipmill's own `Decision needed:` tasks
+  left from earlier questions are resolved; other tasks are left alone
+- a declined pull request is opened again from its branch; a merged one can't be, so the seed
+  says so and leaves it (delete the repository to seed it again)
+- a file on the main branch is written only while it is missing, never overwritten
+
+The seed finds its own work items through a project property, `shipmill-seed`, that maps
+each seed item to the work item made for it, never by search; a work item deleted by hand
+is made again. It refuses a project whose name is not `--project-name`, so it never resets
+a project it did not make.
+
+### Credentials
+
+Three variables, from the shell or from `tmp/seed.env` at the repository root (`tmp/` is
+git-ignored; the shell wins over the file):
 
 | Variable | What |
 |---|---|
 | `ATLASSIAN_EMAIL` | The Atlassian account email both tokens belong to |
-| `JIRA_API_TOKEN` | An API token without scopes from id.atlassian.com, for an account that may create projects (Jira admin) |
-| `BITBUCKET_API_TOKEN` | A Bitbucket API token with scopes `read:repository:bitbucket`, `write:repository:bitbucket`, `admin:repository:bitbucket`, `read:pullrequest:bitbucket`, `write:pullrequest:bitbucket` |
+| `JIRA_API_TOKEN` | A classic API token (Create API token, not the one with scopes) from id.atlassian.com, for a Jira admin: the seed creates a project and deletes the app's entity property on its work items, and calls `<site>/rest/api/3`, which a scoped token can't |
+| `BITBUCKET_API_TOKEN` | An API token with scopes from id.atlassian.com, app Bitbucket, scopes `read:repository:bitbucket`, `write:repository:bitbucket`, `admin:repository:bitbucket` (creates the repository), `read:pullrequest:bitbucket`, `write:pullrequest:bitbucket` (pull requests and their tasks) |
+
+```text
+# tmp/seed.env
+ATLASSIAN_EMAIL=you@example.com
+JIRA_API_TOKEN=...
+BITBUCKET_API_TOKEN=...
+```
+
+### Run
 
 ```bash
 npm run seed -- --jira-site example.atlassian.net --bitbucket-workspace example --dry-run
@@ -101,9 +131,12 @@ npm run seed -- --jira-site example.atlassian.net --bitbucket-workspace example
 
 `--dry-run` only reads and prints the plan. Branch names and pull request titles carry the
 work item keys, so before the Jira work items exist a dry run plans Jira only and leaves out
-the Bitbucket changes. `--project-key` and `--repository` change the
-names. The seed finds its own work items through a project property, `shipmill-seed`, that
-maps each seed item to the work item made for it; a work item deleted by hand is made again.
+the Bitbucket changes. `--project-key`, `--project-name` and `--repository` seed a second
+demo next to the first (for example `--project-key DEMO --project-name "Harbor demo"
+--repository harbor-demo`); Jira project names are unique on a site.
+
+Then, with both apps installed and paired: the release panel on the project shows the three
+decisions, and the `dev` trigger's `prepare` action (with `llm` false) asks them.
 
 ## Decisions and the LLM switch
 

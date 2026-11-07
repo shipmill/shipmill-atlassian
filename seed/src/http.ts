@@ -22,6 +22,10 @@ export class Http {
     return this.#json(await this.#send('GET', path, undefined, undefined), 'GET', path, [200]);
   }
 
+  async delete(path: string, expect: readonly number[]): Promise<void> {
+    await this.#check(await this.#send('DELETE', path, undefined, undefined), 'DELETE', path, expect);
+  }
+
   async send(method: 'POST' | 'PUT', path: string, body: unknown, expect: readonly number[]): Promise<unknown> {
     const response = await this.#send(method, path, JSON.stringify(body), 'application/json');
     return this.#json(response, method, path, expect);

@@ -1,9 +1,9 @@
 // Reads and writes the demo repository in a Bitbucket workspace through REST 2.0
 
 import { Http, list, record, text } from './http';
-import type { BitbucketAction, BitbucketState } from './plan';
+import type { BitbucketAction, BitbucketState, PullRequestState, TaskState } from './plan';
 
-const PULL_REQUEST_STATES = ['OPEN', 'MERGED', 'DECLINED', 'SUPERSEDED'];
+const PULL_REQUEST_STATES = ['OPEN', 'MERGED', 'DECLINED', 'SUPERSEDED'] as const;
 const AUTHOR = 'shipmill seed <seed@shipmill.invalid>';
 
 export class Bitbucket {
@@ -19,7 +19,7 @@ export class Bitbucket {
   async read(mainFiles: ReadonlyMap<string, string>): Promise<BitbucketState> {
     const repository = await this.#http.find(this.#repo);
     if (repository === undefined) {
-      return { repository: false, mainFiles: new Set(), branches: new Set(), pullRequestBranches: new Set() };
+      return { repository: false, mainFiles: new Set(), branches: new Set(), pullRequests: new Map() };
     }
     this.#readMain(repository);
 
@@ -38,12 +38,20 @@ export class Bitbucket {
     }
     const states = PULL_REQUEST_STATES.map((state) => `state=${state}`).join('&');
     const pullRequests = await this.#pages(`${this.#repo}/pullrequests?${states}&pagelen=50`);
-    const pullRequestBranches = new Set(
-      pullRequests.map((pr) =>
-        text(record(record(record(pr, 'pull request').source, 'source').branch, 'source branch').name, 'source branch name'),
-      ),
-    );
-    return { repository: true, mainFiles: present, branches, pullRequestBranches };
+    const byBranch = new Map<string, PullRequestState[]>();
+    for (const value of pullRequests) {
+      const pr = record(value, 'pull request');
+      const branch = text(record(record(pr.source, 'source').branch, 'source branch').name, 'source branch name');
+      const id = pr.id;
+      if (typeof id !== 'number') {
+        throw new Error(`pull request on ${branch} has no numeric id`);
+      }
+      const state = pullRequestState(pr.state, id);
+      // Tasks matter only while a pull request is open
+      const tasks = state === 'OPEN' ? (await this.#pages(`${this.#repo}/pullrequests/${id}/tasks?pagelen=100`)).map(taskState) : [];
+      byBranch.set(branch, [...(byBranch.get(branch) ?? []), { id, state, tasks }]);
+    }
+    return { repository: true, mainFiles: present, branches, pullRequests: byBranch };
   }
 
   async apply(action: BitbucketAction): Promise<void> {
@@ -64,20 +72,46 @@ export class Bitbucket {
         const files = new Map([[action.spec.path, action.spec.content]]);
         return this.#commit(action.spec.branch, files, action.spec.title, await this.#head(true));
       }
-      case 'create-pull-request':
-        await this.#http.send(
-          'POST',
-          `${this.#repo}/pullrequests`,
-          {
-            title: action.spec.title,
-            description: action.spec.description,
-            source: { branch: { name: action.spec.branch } },
-            destination: { branch: { name: this.#main } },
-          },
-          [201],
+      case 'create-pull-request': {
+        const created = record(
+          await this.#http.send(
+            'POST',
+            `${this.#repo}/pullrequests`,
+            {
+              title: action.spec.title,
+              description: action.spec.description,
+              source: { branch: { name: action.spec.branch } },
+              destination: { branch: { name: this.#main } },
+            },
+            [201],
+          ),
+          'created pull request',
         );
+        if (typeof created.id !== 'number') {
+          throw new Error(`the pull request for ${action.spec.branch} came back without a numeric id`);
+        }
+        if (action.spec.task !== undefined) {
+          await this.#openTask(created.id, action.spec.task);
+        }
+        return;
+      }
+      case 'open-task':
+        return this.#openTask(action.pullRequest, action.text);
+      case 'reopen-task':
+        return this.#taskState(action.pullRequest, action.task, 'UNRESOLVED');
+      case 'resolve-task':
+        return this.#taskState(action.pullRequest, action.task, 'RESOLVED');
+      case 'merged':
         return;
     }
+  }
+
+  async #openTask(pullRequest: number, raw: string): Promise<void> {
+    await this.#http.send('POST', `${this.#repo}/pullrequests/${pullRequest}/tasks`, { content: { raw } }, [201]);
+  }
+
+  async #taskState(pullRequest: number, task: number, state: 'RESOLVED' | 'UNRESOLVED'): Promise<void> {
+    await this.#http.send('PUT', `${this.#repo}/pullrequests/${pullRequest}/tasks/${task}`, { state }, [200]);
   }
 
   // An empty repository may name no main branch yet; its first commit makes "main"
@@ -123,4 +157,28 @@ export class Bitbucket {
     }
     return values;
   }
+}
+
+function pullRequestState(value: unknown, id: number): PullRequestState['state'] {
+  const state = PULL_REQUEST_STATES.find((known) => known === value);
+  if (state === undefined) {
+    throw new Error(`pull request #${id} has an unknown state ${JSON.stringify(value)}`);
+  }
+  return state;
+}
+
+// A pull request task as Bitbucket returns it
+export function taskState(value: unknown): TaskState {
+  const task = record(value, 'task');
+  if (typeof task.id !== 'number') {
+    throw new Error('a task has no numeric id');
+  }
+  if (task.state !== 'RESOLVED' && task.state !== 'UNRESOLVED') {
+    throw new Error(`task ${task.id} has an unknown state ${JSON.stringify(task.state)}`);
+  }
+  const raw = record(task.content, `task ${task.id} content`).raw;
+  if (typeof raw !== 'string') {
+    throw new Error(`task ${task.id} has no text`);
+  }
+  return { id: task.id, text: raw, resolved: task.state === 'RESOLVED' };
 }

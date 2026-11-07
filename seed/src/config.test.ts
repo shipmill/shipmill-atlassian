@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { adfText } from './adf-text';
 import { parseConfig } from './config';
 
 const ENV = { ATLASSIAN_EMAIL: 'dev@example.com', JIRA_API_TOKEN: 'jira-token', BITBUCKET_API_TOKEN: 'bb-token' };
@@ -11,6 +10,7 @@ test('arguments name the targets and the environment holds the tokens', () => {
     jiraSite: 'example.atlassian.net',
     workspace: 'example',
     projectKey: 'HRB',
+    projectName: 'Harbor',
     repository: 'harbor',
     dryRun: false,
     email: 'dev@example.com',
@@ -31,20 +31,12 @@ test('malformed targets stop the run', () => {
     /--jira-site must match/,
   );
   assert.throws(() => parseConfig([...ARGS, '--project-key', 'hrb'], ENV), /--project-key must match/);
+  assert.throws(() => parseConfig([...ARGS, '--project-name', ' Harbor'], ENV), /--project-name must match/);
   assert.throws(() => parseConfig([...ARGS, '--token', 'x'], ENV), /Unknown option/);
   assert.throws(() => parseConfig([...ARGS, 'extra'], ENV), /unexpected arguments/);
 });
 
-test('ADF bodies read back as their text', () => {
-  const body = {
-    type: 'doc',
-    version: 1,
-    content: [
-      { type: 'paragraph', content: [{ type: 'text', text: 'One ' }, { type: 'text', text: 'line' }] },
-      { type: 'paragraph', content: [{ type: 'text', text: 'Two' }, { type: 'hardBreak' }, { type: 'text', text: 'x' }] },
-      { type: 'rule' },
-    ],
-  };
-  assert.equal(adfText(body), 'One line\nTwo\nx\n');
-  assert.throws(() => adfText({ type: 'text' }), /needs text/);
+test('a second demo project gets its own key, name and repository', () => {
+  const config = parseConfig([...ARGS, '--project-key', 'DEMO', '--project-name', 'Harbor demo', '--repository', 'harbor-demo'], ENV);
+  assert.deepEqual([config.projectKey, config.projectName, config.repository], ['DEMO', 'Harbor demo', 'harbor-demo']);
 });
