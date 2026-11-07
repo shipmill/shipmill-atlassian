@@ -1,5 +1,6 @@
 import api, { route, type APIResponse } from '@forge/api';
 import { array, natural, nonEmpty, object, string } from '@shipmill-atlassian/shared/parse';
+import { timestamp } from '@shipmill-atlassian/shared/release';
 import type { Confluence } from './decision-log';
 
 // The Confluence REST v2 calls of the decision log, as the app, so the page shows as written
@@ -23,24 +24,25 @@ export const forgeConfluence: Confluence = {
     const first = found[0];
     return first === undefined ? undefined : nonEmpty(object(first, what).id, `${what}.id`);
   },
-  async page(spaceId, title) {
-    const what = `finding page ${JSON.stringify(title)}`;
+  async pages(spaceId, title) {
+    const what = `finding pages ${JSON.stringify(title)}`;
     const found = await results(
       await api
         .asApp()
         .requestConfluence(route`/wiki/api/v2/spaces/${spaceId}/pages?title=${title}&body-format=storage`, { headers: { Accept: 'application/json' } }),
       what,
     );
-    if (found.length > 1) throw new Error(`${found.length} pages titled ${JSON.stringify(title)} in space ${spaceId}`);
-    const first = found[0];
-    if (first === undefined) return undefined;
-    const page = object(first, what);
-    const storage = object(object(page.body, `${what}.body`).storage, `${what}.body.storage`);
-    return {
-      id: nonEmpty(page.id, `${what}.id`),
-      version: natural(object(page.version, `${what}.version`).number, `${what}.version.number`),
-      body: string(storage.value, `${what}.body.storage.value`),
-    };
+    return found.map((value, index) => {
+      const path = `${what}[${index}]`;
+      const page = object(value, path);
+      const storage = object(object(page.body, `${path}.body`).storage, `${path}.body.storage`);
+      return {
+        id: nonEmpty(page.id, `${path}.id`),
+        version: natural(object(page.version, `${path}.version`).number, `${path}.version.number`),
+        body: string(storage.value, `${path}.body.storage.value`),
+        createdAt: timestamp(page.createdAt, `${path}.createdAt`),
+      };
+    });
   },
   async createPage(spaceId, title, body) {
     const what = `creating page ${JSON.stringify(title)}`;

@@ -6,6 +6,11 @@ import { commentId, parsePerson, timestamp, type CommentId, type Person } from '
 // app's settings page, with a row per relayed decision. The relay hands each decision to a
 // queue (see relay-trigger.ts) and a consumer writes the row, so a failed write is a failed
 // consumer run in the logs and never touches the decision itself. No space set, no page.
+//
+// Confluence allows two pages with one title in a space, so two consumers writing a project's
+// first rows at once would each create a page. The queue runs one event per project at a
+// time (a Forge concurrency key, limit 1), and the writer appends to the oldest page with the
+// title, so a duplicate made some other way never splits the log further.
 
 // A Confluence space key: letters and digits, or a personal space's "~" and account id
 const SPACE_KEY = /^(?:[A-Za-z0-9]+|~[A-Za-z0-9:_-]+)$/;
@@ -32,6 +37,21 @@ export interface DecisionLog {
   record(decision: LoggedDecision): Promise<void>;
 }
 
+// A Forge queue event: the concurrency key lets one log write per project run at a time
+export type LogEvent = { body: LoggedDecision; concurrency: { key: string; limit: 1 } };
+
+export function logEvent(decision: LoggedDecision): LogEvent {
+  return { body: decision, concurrency: { key: `decision-log-${projectOf(decision.key)}`, limit: 1 } };
+}
+
+export function queuedDecisionLog(push: (event: LogEvent) => Promise<unknown>): DecisionLog {
+  return {
+    async record(decision) {
+      await push(logEvent(decision));
+    },
+  };
+}
+
 export function parseLoggedDecision(value: unknown, path: string): LoggedDecision {
   const fields = object(value, path);
   return {
@@ -44,12 +64,12 @@ export function parseLoggedDecision(value: unknown, path: string): LoggedDecisio
   };
 }
 
-export type Page = { id: string; version: number; body: string };
+export type Page = { id: string; version: number; body: string; createdAt: string };
 
 // The Confluence calls the log makes, as an interface so tests run them on a fake
 export interface Confluence {
   spaceId(space: SpaceKey): Promise<string | undefined>;
-  page(spaceId: string, title: string): Promise<Page | undefined>;
+  pages(spaceId: string, title: string): Promise<Page[]>;
   createPage(spaceId: string, title: string, body: string): Promise<string>;
   updatePage(page: Page, title: string, body: string): Promise<void>;
 }
@@ -100,6 +120,10 @@ export function appendRow(body: string, decision: LoggedDecision, site: string):
   return body.slice(0, end) + decisionRow(decision, site) + body.slice(end);
 }
 
+function oldest(pages: Page[]): Page | undefined {
+  return pages.toSorted((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id.localeCompare(b.id))[0];
+}
+
 export type LogOutcome = { written: false; reason: 'off' } | { written: true; page: string; created: boolean };
 
 export async function writeDecision(
@@ -111,7 +135,7 @@ export async function writeDecision(
   if (spaceId === undefined) throw new DecisionLogError(`no Confluence space ${deps.space} for the decision log`);
   const site = await deps.site();
   const title = pageTitle(decision);
-  const page = await deps.confluence.page(spaceId, title);
+  const page = oldest(await deps.confluence.pages(spaceId, title));
   if (page === undefined) return { written: true, page: await deps.confluence.createPage(spaceId, title, newPage(decision, site)), created: true };
   await deps.confluence.updatePage(page, title, appendRow(page.body, decision, site));
   return { written: true, page: page.id, created: false };
