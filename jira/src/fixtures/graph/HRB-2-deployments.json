@@ -1,25 +1,14 @@
 {
   "data": {
-    "cypherQuery": {
+    "jiraWorkItemLinkedExternalDeployments": {
       "edges": [
         {
           "node": {
-            "columns": [
-              {
-                "key": "found",
-                "value": {
-                  "__typename": "CypherQueryResultNode",
-                  "id": "ari:cloud:graph::deployment/shipmill-dev/harbor/41",
-                  "data": {
-                    "__typename": "ExternalDeployment",
-                    "displayName": "harbor #41",
-                    "url": "https://bitbucket.org/shipmill-dev/harbor/deployments/41",
-                    "state": "SUCCESSFUL",
-                    "environment": { "displayName": "Staging" }
-                  }
-                }
-              }
-            ]
+            "__typename": "ExternalDeployment",
+            "displayName": "harbor #41",
+            "url": "https://bitbucket.org/shipmill-dev/harbor/deployments/41",
+            "state": "SUCCESSFUL",
+            "environment": { "displayName": "Staging" }
           }
         }
       ]

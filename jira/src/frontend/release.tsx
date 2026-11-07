@@ -15,18 +15,14 @@ import ForgeReconciler, {
 } from '@forge/react';
 import React, { useEffect, useState } from 'react';
 import { pullRequestLabel } from '@shipmill-atlassian/shared/pull-requests';
-import type { AskQueued, PanelView } from '../panel-resolver';
+import { queuedText, type AskQueued } from '../ask-queued';
+import type { PanelView } from '../panel-resolver';
 import type { PullRequestDecision } from '../finder';
 import type { PanelDecision } from '../release-panel';
 
 // Without metadata requested, invoke resolves to the resolver's return value itself
 const getPanel = (version?: string) => invoke('getPanel', version === undefined ? {} : { version }) as Promise<PanelView>;
 const ask = (version: string) => invoke('ask', { version }) as Promise<AskQueued>;
-
-function queuedText(queued: AskQueued): string {
-  const graph = queued.graphRead.length === 0 ? 'The Teamwork Graph had no evidence to cite.' : `The comments cite the Teamwork Graph on ${queued.graphRead.join(', ')}.`;
-  return `Asking the open decisions of ${queued.version} in the background; refresh in a minute to see them asked. ${graph}`;
-}
 
 function asked(decision: PanelDecision): string {
   return decision.askedAt === null ? 'not asked yet' : `asked ${decision.askedAt.slice(0, 10)}`;

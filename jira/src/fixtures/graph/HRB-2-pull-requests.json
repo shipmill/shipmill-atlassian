@@ -1,24 +1,13 @@
 {
   "data": {
-    "cypherQuery": {
+    "jiraWorkItemLinkedExternalPullRequests": {
       "edges": [
         {
           "node": {
-            "columns": [
-              {
-                "key": "found",
-                "value": {
-                  "__typename": "CypherQueryResultNode",
-                  "id": "ari:cloud:graph::pull-request/shipmill-dev/harbor/2",
-                  "data": {
-                    "__typename": "ExternalPullRequest",
-                    "title": "HRB-2 Rejects API v1 tokens with a pointer to the migration guide",
-                    "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/2",
-                    "status": "OPEN"
-                  }
-                }
-              }
-            ]
+            "__typename": "ExternalPullRequest",
+            "title": "HRB-2 Rejects API v1 tokens with a pointer to the migration guide",
+            "url": "https://bitbucket.org/shipmill-dev/harbor/pull-requests/2",
+            "status": "OPEN"
           }
         }
       ]

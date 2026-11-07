@@ -202,13 +202,22 @@ counts.
 ## Evidence from the Teamwork Graph
 
 The preparer also asks the [Teamwork Graph](https://developer.atlassian.com/platform/teamwork-graph/)
-what is linked to the work item: its pull requests, its deployments and the teams it is
-assigned to. What it finds is added to the question's evidence line, and the teams are named
-as who may decide besides the person asked:
+what is linked to the work item: its pull requests and its deployments. What it finds is
+added to the question's evidence line:
 
 ```text
-Evidence: asked in the description of HRB-2: "..."; in the Teamwork Graph, pull request "HRB-2 Rejects API v1 tokens ..." (open, https://bitbucket.org/...); assigned to team Harbor API, who may decide too
+Evidence: asked in the description of HRB-2: "..."; in the Teamwork Graph, pull request "HRB-2 Rejects API v1 tokens ..." (open, https://bitbucket.org/...); deployment harbor #41 to Staging (successful, https://bitbucket.org/...)
 ```
+
+It reads them through the graph's
+[curated queries](https://developer.atlassian.com/platform/teamwork-graph/curated-queries/)
+`jiraWorkItemLinkedExternalPullRequests` and `jiraWorkItemLinkedExternalDeployments`, since
+the graph no longer takes Cypher text from new apps
+([migrate from raw Cypher](https://developer.atlassian.com/platform/teamwork-graph/migrate-from-raw-cypher/)).
+The teams a work item is assigned to are not read yet: no curated query covers them, and a
+[persisted query](https://developer.atlassian.com/platform/teamwork-graph/persisted-cypher-queries/)
+must first be registered for the app by one of its contributors. The prepare logs that the
+teams were not read; once they are, they are named as who may decide besides the person asked.
 
 Jira REST stays the source of everything else, so without the graph the comment is exactly
 as above. The graph answers only as a user, so the release panel's Ask decisions button reads

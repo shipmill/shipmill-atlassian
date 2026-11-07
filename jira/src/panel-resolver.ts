@@ -2,6 +2,7 @@ import api, { route } from '@forge/api';
 import Resolver from '@forge/resolver';
 import { projectKey, type ProjectKey } from '@shipmill-atlassian/shared/jira-key';
 import { ParseError, nonEmpty, object } from '@shipmill-atlassian/shared/parse';
+import type { AskQueued } from './ask-queued';
 import { forgeDecisionJira } from './decision-jira';
 import { pullRequestDecisions } from './finder';
 import { forgeUserGraph, siteCloudId, siteGraph, unavailableGraph } from './graph';
@@ -47,9 +48,6 @@ export async function panelView(project: ProjectKey, picked: string | undefined)
   return { versions, panel: await releasePanel(release, forgeDecisionJira, onPullRequests) };
 }
 
-// What "Ask decisions" queued: the version, and the items the graph had evidence on
-export type AskQueued = { version: string; graphRead: string[] };
-
 // Runs as the user who pressed the button: the graph is read here, as them, and travels to
 // the prepare consumer in the event body. The decisions are asked in the background, since
 // preparing them can take longer than a resolver's 25 s.
@@ -63,9 +61,10 @@ export async function askFromPanel(project: ProjectKey, version: string, install
       : siteGraph(forgeUserGraph, forgeIssueRest, siteCloudId(installContext));
   const lookups = await graphForAsk(release, llm, forgeDecisionJira, graph);
   await enqueuePrepare(project, version, llm, lookups);
+  const asked = Object.keys(lookups);
   const graphRead = graphFound(lookups);
-  console.log(`ask ${project} ${version} (llm ${llm}) queued; graph read for ${Object.keys(lookups).join(', ') || 'no item'}`);
-  return { version, graphRead };
+  console.log(`ask ${project} ${version} (llm ${llm}) queued; graph read for ${asked.join(', ') || 'no item'}`);
+  return { version, asked, graphRead };
 }
 
 const resolver = new Resolver();
