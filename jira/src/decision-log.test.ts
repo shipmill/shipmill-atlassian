@@ -6,10 +6,13 @@ import { askDecisions } from './ask';
 import {
   DecisionLogError,
   decisionRow,
+  logEvent,
   parseLoggedDecision,
+  queuedDecisionLog,
   spaceKey,
   writeDecision,
   type Confluence,
+  type LogEvent,
   type LoggedDecision,
   type Page,
 } from './decision-log';
@@ -35,34 +38,62 @@ const DECISION: LoggedDecision = {
   replyId: commentId('20004'),
 };
 
-// An in-memory Confluence with one space, DOCS
+// An in-memory Confluence with one space, DOCS. Like Confluence, it allows two pages with
+// one title, and every call yields, so writes that are not serialized can interleave.
 class FakeConfluence implements Confluence {
-  readonly pages = new Map<string, Page & { title: string; spaceId: string }>();
+  readonly stored = new Map<string, Page & { title: string; spaceId: string }>();
   #next = 100;
+  #clock = Date.parse('2026-12-03T11:00:00.000Z');
 
   async spaceId(space: string): Promise<string | undefined> {
+    await tick();
     return space === 'DOCS' ? '9001' : undefined;
   }
 
-  async page(spaceId: string, title: string): Promise<Page | undefined> {
-    return [...this.pages.values()].find((page) => page.spaceId === spaceId && page.title === title);
+  async pages(spaceId: string, title: string): Promise<Page[]> {
+    await tick();
+    return [...this.stored.values()].filter((page) => page.spaceId === spaceId && page.title === title);
   }
 
   async createPage(spaceId: string, title: string, body: string): Promise<string> {
+    await tick();
     const id = String(this.#next++);
-    this.pages.set(id, { id, spaceId, title, version: 1, body });
+    this.stored.set(id, { id, spaceId, title, version: 1, body, createdAt: new Date(this.#clock++).toISOString() });
     return id;
   }
 
   async updatePage(page: Page, title: string, body: string): Promise<void> {
-    const stored = this.pages.get(page.id)!;
-    assert.equal(stored.version, page.version, 'updated from a stale version');
-    this.pages.set(page.id, { ...stored, title, body, version: page.version + 1 });
+    await tick();
+    const stored = this.stored.get(page.id)!;
+    if (stored.version !== page.version) throw new Error(`409: page ${page.id} is at version ${stored.version}, not ${page.version}`);
+    this.stored.set(page.id, { ...stored, title, body, version: page.version + 1 });
+  }
+
+  titled(title: string): (Page & { title: string })[] {
+    return [...this.stored.values()].filter((page) => page.title === title);
   }
 
   rows(id: string): number {
-    return (this.pages.get(id)!.body.match(/<tr>/g) ?? []).length - 1;
+    return (this.stored.get(id)!.body.match(/<tr>/g) ?? []).length - 1;
   }
+}
+
+const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+// The Forge queue as the consumer sees it: events that share a concurrency key with limit 1
+// run one after another, others at once
+function forgeQueue(consume: (decision: LoggedDecision) => Promise<unknown>) {
+  const chains = new Map<string, Promise<unknown>>();
+  const runs: Promise<unknown>[] = [];
+  return {
+    push: async (event: LogEvent) => {
+      assert.equal(event.concurrency.limit, 1);
+      const run = (chains.get(event.concurrency.key) ?? Promise.resolve()).then(() => consume(event.body));
+      chains.set(event.concurrency.key, run);
+      runs.push(run);
+    },
+    drained: () => Promise.all(runs),
+  };
 }
 
 const site = async () => SITE;
@@ -87,7 +118,7 @@ test('with no space set the log is off and Confluence is not called', async () =
     site: async () => assert.fail('read the site with the log off'),
   });
   assert.deepEqual(outcome, { written: false, reason: 'off' });
-  assert.equal(confluence.pages.size, 0);
+  assert.equal(confluence.stored.size, 0);
 });
 
 test('the first decision creates the project\'s page, the next adds a row to it', async () => {
@@ -95,12 +126,12 @@ test('the first decision creates the project\'s page, the next adds a row to it'
   const deps = { space: spaceKey('DOCS'), confluence, site };
   const first = await writeDecision(DECISION, deps);
   assert.deepEqual(first, { written: true, page: '100', created: true });
-  assert.equal(confluence.pages.get('100')?.title, 'Release decisions: HRB');
+  assert.equal(confluence.stored.get('100')?.title, 'Release decisions: HRB');
   assert.equal(confluence.rows('100'), 1);
 
   const second = await writeDecision({ ...DECISION, key: HRB3, replyId: commentId('20009') }, deps);
   assert.deepEqual(second, { written: true, page: '100', created: false });
-  const page = confluence.pages.get('100')!;
+  const page = confluence.stored.get('100')!;
   assert.equal(page.version, 2);
   assert.equal(confluence.rows('100'), 2);
   assert.ok(page.body.indexOf('>HRB-2<') < page.body.indexOf('>HRB-3<'), 'rows in the order decided');
@@ -108,7 +139,48 @@ test('the first decision creates the project\'s page, the next adds a row to it'
 
   // Another project gets its own page
   await writeDecision({ ...DECISION, key: jiraKey('OPS-1') }, deps);
-  assert.equal(confluence.pages.get('101')?.title, 'Release decisions: OPS');
+  assert.equal(confluence.stored.get('101')?.title, 'Release decisions: OPS');
+});
+
+test('two relays at once on one project write one page with two rows', async () => {
+  const jira = await asked();
+  const confluence = new FakeConfluence();
+  const queue = forgeQueue((decision) => writeDecision(decision, { space: spaceKey('DOCS'), confluence, site }));
+  const log = queuedDecisionLog(queue.push);
+  const state = jira.states.get(HRB3)!;
+  await Promise.all([
+    relayReply(HRB2, jira.reply(HRB2, DANA, '2'), { jira, reader: null, now: NOW, log }),
+    relayReply(HRB3, jira.reply(HRB3, state.decider, '1'), { jira, reader: null, now: NOW, log }),
+  ]);
+  await queue.drained();
+  const pages = confluence.titled('Release decisions: HRB');
+  assert.equal(pages.length, 1);
+  assert.equal(confluence.rows(pages[0]!.id), 2);
+});
+
+test('without the concurrency key the same two writes would split the log', async () => {
+  // Why the key matters: unserialized, both writers see no page and each creates one
+  const confluence = new FakeConfluence();
+  const deps = { space: spaceKey('DOCS'), confluence, site };
+  await Promise.all([writeDecision(DECISION, deps), writeDecision({ ...DECISION, key: HRB3 }, deps)]);
+  assert.equal(confluence.titled('Release decisions: HRB').length, 2);
+});
+
+test('log events share a concurrency key per project, limit 1', () => {
+  assert.deepEqual(logEvent(DECISION).concurrency, { key: 'decision-log-HRB', limit: 1 });
+  assert.equal(logEvent({ ...DECISION, key: HRB3 }).concurrency.key, 'decision-log-HRB');
+  assert.equal(logEvent({ ...DECISION, key: jiraKey('OPS-1') }).concurrency.key, 'decision-log-OPS');
+});
+
+test('with two pages of one title already, rows go to the oldest', async () => {
+  const confluence = new FakeConfluence();
+  const deps = { space: spaceKey('DOCS'), confluence, site };
+  await Promise.all([writeDecision(DECISION, deps), writeDecision({ ...DECISION, key: HRB3 }, deps)]);
+  const [first, second] = confluence.titled('Release decisions: HRB');
+  await writeDecision({ ...DECISION, key: jiraKey('HRB-9') }, deps);
+  await writeDecision({ ...DECISION, key: jiraKey('HRB-10') }, deps);
+  assert.equal(confluence.rows(first!.id), 3);
+  assert.equal(confluence.rows(second!.id), 1);
 });
 
 test('a space that is gone, or a page without its table, fails the write loudly', async () => {
