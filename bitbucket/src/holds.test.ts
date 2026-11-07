@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import type { WorkItemStatus } from '@shipmill-atlassian/shared/work-item';
 import type { PullRequest } from './bitbucket-rest';
-import { card, checkResult, holds, type Facts } from './holds';
+import { card, checkResult, holds, verdictLine, type Facts } from './holds';
 
 const DANA = { accountId: '712020:dana', displayName: 'Dana Okafor' };
 const SAM = { accountId: '712020:sam', displayName: 'Sam Reyes' };
@@ -160,4 +160,14 @@ test('the card says why a release or lane is missing', () => {
   const elsewhere = card({ ...CLEAR, workItem: { ...ITEM, fixVersions: [] }, lanes: [] });
   assert.equal(elsewhere.release, 'none: HRB-2 has no fix version');
   assert.equal(elsewhere.lane, 'none: main is not released by shipmill');
+});
+
+test('the verdict line names the pull request, its head, the trigger and each hold', () => {
+  assert.equal(verdictLine(CLEAR, 'on-code-pushed'), 'merge check harbor #2 at 0123456789ab (on-code-pushed): pass; clear to merge');
+  const held: Facts = { ...CLEAR, statuses: [], breaking: ['Drop API v1 tokens'] };
+  assert.equal(
+    verdictLine(held, 'on-merge'),
+    'merge check harbor #2 at 0123456789ab (on-merge): hold build,breaking; build: no build has reported on 0123456789ab; ' +
+      'breaking: the breaking change "Drop API v1 tokens" is undecided: Dana Okafor has not approved it',
+  );
 });
