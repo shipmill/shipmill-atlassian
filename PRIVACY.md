@@ -13,12 +13,14 @@ on. Both read only through Atlassian's own APIs, with the scopes the install scr
 ## What the apps store
 
 Per install, in Atlassian's Forge storage: the secret that pairs the two apps, the Jira app's
-web trigger address (in the Bitbucket app), whether Claude is switched on, and, in the
+web trigger address (in the Bitbucket app), whether Claude is switched on, the Confluence space of the decision log, and, in the
 Bitbucket app, which comment and task asked each decision on a pull request and who was
 asked. What the apps
 write back, comments, labels, pull request tasks, and the `shipmill-decision` property on a
 work item (the question asked, its options, who decides and their answer), lives in your Jira
-and Bitbucket like any other comment.
+and Bitbucket like any other comment. With a decision log space set, the Jira app also writes
+a page per project in that Confluence space, with a row per decision: the work item, the
+question, the answer, who decided and when.
 
 ## Where data goes
 

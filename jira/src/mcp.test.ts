@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { jiraKey, type ProjectKey } from '@shipmill-atlassian/shared/jira-key';
 import { NEEDS_DECISION, commentId } from '@shipmill-atlassian/shared/release';
-import { APP, FakeJira } from './fake-jira';
+import { APP, FakeJira, FakeLog } from './fake-jira';
 import { SEED_PROJECT, SEED_VERSION, seedRelease } from './fixtures';
 import {
   askDecision,
@@ -138,7 +138,7 @@ test('read answer goes from not asked to waiting to decided, with the relayed an
   assert.equal(waiting.status, 'waiting');
 
   const state = (await jira.state(HRB2))!;
-  const outcome = await relayReply(HRB2, jira.reply(HRB2, state.decider, '2'), { jira, reader: null, now: () => new Date('2026-12-03T10:00:00.000Z') });
+  const outcome = await relayReply(HRB2, jira.reply(HRB2, state.decider, '2'), { jira, reader: null, now: () => new Date('2026-12-03T10:00:00.000Z'), log: new FakeLog() });
   assert.equal(outcome.relayed, true);
   const decided = await readAnswer({ item: HRB2 }, { permissions, jira });
   if (decided.status !== 'decided') throw new Error(`expected decided, got ${decided.status}`);

@@ -167,6 +167,28 @@ The release panel's Ask decisions button starts it for the picked fix version (s
 too: a signed `{"action":"prepare","project":"HRB","version":"2.4","llm":false}` asks the
 release's decisions, and `{"action":"decision","key":"HRB-2"}` shows what the item waits on.
 
+## The Confluence decision log
+
+Each relayed decision can also go on a Confluence page, so a release's decisions outlive the
+work items' comments. On the app's settings page an admin enters a Confluence space key; with
+none set the log is off and the app never calls Confluence.
+
+With a space set, the first decision relayed on a project's work item creates the page
+"Release decisions: HRB" in that space, and every later one adds a row to its table: the work
+item, the question, the option taken (or the decider's own answer), who decided, when, and
+links to the work item and the reply that ended the wait. For a reply made on a pull request,
+the reply link is shipmill's relay comment that quotes it. The decider is named, not
+mentioned, so the log notifies nobody.
+
+The app writes the page as itself, after the decision is recorded in Jira. The relay hands the
+decision to a `decision-log` queue and a consumer writes the row, so a failed write (a space
+deleted, a page whose table was removed, Confluence not on the site) is a failed consumer run
+in the app's logs and never undoes the decision. The space must be on the same site as Jira.
+
+The log needs three Confluence scopes: `read:space:confluence`, `read:page:confluence` and
+`write:page:confluence`. **An install from before the log asks for consent again on upgrade**:
+until an admin approves the new scopes, the site keeps the version without the log.
+
 ## Decisions on pull requests
 
 When the work item a pull request names waits on a question the Jira app asked, the

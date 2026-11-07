@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { NEEDS_DECISION, commentId, type Release } from '@shipmill-atlassian/shared/release';
 import { askDecisions } from './ask';
-import { FakeJira, LEAD } from './fake-jira';
+import { FakeJira, FakeLog, LEAD } from './fake-jira';
 import { seedRelease } from './fixtures';
 import { findDecisions, pullRequestDecisions, type Decision } from './finder';
 import { templatePreparer } from './prepare';
@@ -80,7 +80,7 @@ test('on the seed the panel shows ready to ship once the decisions are answered 
   const now = ticking('2026-12-03T12:00:00.000Z');
   for (const key of [HRB3, HRB4]) {
     const state = (await jira.state(key))!;
-    const outcome = await relayReply(key, jira.reply(key, state.decider, '1'), { jira, reader: null, now });
+    const outcome = await relayReply(key, jira.reply(key, state.decider, '1'), { jira, reader: null, now, log: new FakeLog() });
     assert.equal(outcome.relayed, true, `${key}: ${JSON.stringify(outcome)}`);
   }
   // Still blocked on HRB-2 alone
@@ -93,7 +93,7 @@ test('on the seed the panel shows ready to ship once the decisions are answered 
   const pullRequest = before.items.find((item) => item.key === HRB2)!.pullRequests[0]!;
   const outcome = await relayPullRequestReply(
     { kind: 'decision-reply', sentAt: now().getTime(), key: HRB2, questionId: state.questionId, author: state.decider, text: '2', pullRequest: { id: pullRequest.id, url: pullRequest.url } },
-    { jira, reader: null, now },
+    { jira, reader: null, now, log: new FakeLog() },
   );
   assert.equal(outcome.relayed, true, JSON.stringify(outcome));
   const after = await releasePanel(relabelled(before, jira), jira, []);
