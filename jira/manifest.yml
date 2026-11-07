@@ -39,6 +39,69 @@ modules:
     - key: prepare-consumer
       queue: prepare-releases
       function: on-prepare-release
+  # MCP: a coding agent lists a release's blocking decisions, asks one and reads its answer.
+  # Tools are the actions below; an admin exposes them per site (see README, "Ask from a
+  # coding agent through MCP"). Each runs for the caller and checks their Jira permissions.
+  action:
+    - key: list-release-decisions
+      name: List release decisions
+      function: mcp-list-decisions
+      actionVerb: GET
+      description: >
+        List a Jira fix version's blocking decisions, oldest first: the question, who it waits
+        on, when shipmill asked (null if not yet) and linked pull requests. Also the project's
+        open fix versions; ready is true when nothing blocks.
+      inputs:
+        project:
+          title: Project key
+          type: string
+          required: true
+          description: "The Jira project key, for example HRB"
+        version:
+          title: Fix version
+          type: string
+          required: false
+          description: "The fix version name, for example 2.4; the project's first open version when left out"
+    - key: ask-decision
+      name: Ask a release decision
+      function: mcp-ask-decision
+      actionVerb: CREATE
+      description: >
+        Ask one blocking decision (a work item labelled needs-decision in the fix version):
+        shipmill posts its prepared question with numbered options as a Jira comment to the
+        person it waits on. Not asked twice. Returns read-decision-answer's view.
+      inputs:
+        issueKey:
+          title: Work item key
+          type: string
+          required: true
+          description: "The work item that holds the decision, for example HRB-2"
+        version:
+          title: Fix version
+          type: string
+          required: true
+          description: "The open fix version the decision blocks, for example 2.4"
+    - key: read-decision-answer
+      name: Read a decision's answer
+      function: mcp-read-answer
+      actionVerb: GET
+      description: >
+        Read where a decision shipmill asked on a Jira work item stands: not-asked, waiting
+        (the question, its numbered options and who it waits on) or decided (the answer as
+        relayed, and when).
+      inputs:
+        issueKey:
+          title: Work item key
+          type: string
+          required: true
+          description: "The work item that holds the decision, for example HRB-2"
+  rovo:mcp:
+    - key: release-decisions-mcp
+      name: shipmill Release Decisions
+      tools:
+        - list-release-decisions
+        - ask-decision
+        - read-decision-answer
   llm:
     - key: decisions-llm
       model:
@@ -63,6 +126,12 @@ modules:
     - key: on-prepare-release
       handler: index.onPrepareRelease
       timeoutSeconds: 600
+    - key: mcp-list-decisions
+      handler: index.mcpListDecisions
+    - key: mcp-ask-decision
+      handler: index.mcpAskDecision
+    - key: mcp-read-answer
+      handler: index.mcpReadAnswer
 resources:
   - key: admin
     path: src/frontend/admin.tsx

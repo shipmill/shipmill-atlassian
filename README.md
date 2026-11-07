@@ -18,6 +18,7 @@ panel shows what a fix version still waits on.
 | `bitbucket/` | The Bitbucket app: pull request events, decisions on pull requests, the merge check, the pull request card and the workspace settings page |
 | `shared/` | Code both apps use: the signed bridge protocol, Jira keys, comment bodies |
 | `seed/` | A script that makes the demo release on a Jira site and a Bitbucket workspace |
+| `scripts/mcp-check.py` | A headless MCP client for the Jira app's tools, for a live check |
 
 ## Connect the two apps
 
@@ -264,6 +265,12 @@ person who pressed it, for the labelled items (every item while the LLM switch i
 Claude may find a decision on any of them). An item that already waits on an answer is not
 asked again, and its graph is not read.
 
+The panel acts for the person viewing it: Jira is asked, as them, whether they may browse the
+project (and comment in it, to ask), and the work items are read as them, so the panel shows
+what Jira shows them. Acting as the user needs their consent to the app, so the first time
+someone opens the panel Forge asks them to allow access. That one consent is also what the
+MCP tools need (next section but one).
+
 ## A pull request's decision blocks the release
 
 A decision can also start on the pull request: anyone opens a task there that starts with
@@ -279,6 +286,69 @@ Bitbucket has no event for a task, so the report goes out whenever the app reads
 request: when it is opened, edited or commented on, when the merge check runs and when
 someone opens the pull request page with its card. Jira keeps the report per pull request,
 so a title edited to name another work item moves the decisions with it.
+
+## Ask from a coding agent through MCP
+
+The Jira app exposes three tools over MCP (a `rovo:mcp` module over Rovo actions), so a
+coding agent such as a shipmill session in Claude Code can work a release's decisions from
+outside Jira:
+
+| Tool | What |
+|---|---|
+| `list-release-decisions` | A fix version's blocking decisions, as the release panel lists them, and the project's open fix versions (`project`, optional `version`) |
+| `ask-decision` | Asks one blocking decision the way Ask decisions does: shipmill posts the prepared question on the work item and records it (`issueKey`, `version`). The question comes from the template, with no LLM call; a decision already waiting is not asked again |
+| `read-decision-answer` | Where a decision stands: not asked, waiting (question, numbered options, who it waits on) or decided (the relayed answer) (`issueKey`) |
+
+Every tool runs for the person the MCP client signed in as, and never lets them read or ask
+what Jira would not: Jira is asked, as them (`/rest/api/3/mypermissions`), whether they may
+browse the project or work item, and for `ask-decision` whether they may comment on it; the
+release is read as them, so issue security hides what it hides in Jira. Only the writes
+(the question comment, the label, the decision's entity property) go as the app, as they do
+from the panel, so the comment shows as shipmill's.
+
+Calling Jira as the user needs that user's consent to the app, which only a Forge UI can ask
+for. Without it a tool fails with `MCP_UNAUTHENTICATED: User consent required`. So each
+person **opens the Release decisions panel once and allows access** before using the tools.
+
+Connect a client:
+
+1. A site admin opens [admin.atlassian.com](https://admin.atlassian.com), then the site,
+   Connected apps, shipmill Release Decisions, Tools, and turns on **Expose tools to
+   MCP-compatible apps** (one switch for all the app's tools, off by default)
+2. Each user opens the Release decisions panel in a project once and allows access
+3. Add the server to the client. It is `https://mcp.atlassian.com/forge/<app-id>`, for this
+   app `https://mcp.atlassian.com/forge/e68108c0-f2e4-427b-9417-b3878322c288`; in Claude Code:
+
+   ```bash
+   claude mcp add --transport http shipmill-decisions https://mcp.atlassian.com/forge/e68108c0-f2e4-427b-9417-b3878322c288
+   ```
+
+4. Sign in with OAuth (in Claude Code, `/mcp`, then the server, then Authenticate, from an
+   interactive terminal): the consent screen names the client and the app, you pick the site
+   and allow access
+
+The tools carry the environment in their names: `list-release-decisions_development` from a
+development deploy, and so on.
+
+A run, on the demo release (see Seed a demo release): ask the agent to list what HRB 2.4
+waits on, ask HRB-2, then answer on HRB-2 in Jira as the person it waits on (a reply that
+starts with an option number) and ask the agent to read the answer.
+
+`scripts/mcp-check.py` does the same without Claude Code, for a live check. It needs
+[uv](https://docs.astral.sh/uv/); the first run prints an `AUTHORIZE` URL to open in a browser,
+and keeps the OAuth client and tokens in `tmp/mcp-check-state.json` (git-ignored):
+
+```bash
+uv run scripts/mcp-check.py list HRB 2.4
+```
+
+```bash
+uv run scripts/mcp-check.py ask HRB-2 2.4
+```
+
+```bash
+uv run scripts/mcp-check.py answer HRB-2
+```
 
 ## Privacy
 
