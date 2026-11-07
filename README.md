@@ -60,6 +60,10 @@ To ask decisions from a coding agent, a site admin opens
 Release Decisions, Tools, and turns on **Expose tools to MCP-compatible apps**. Then follow
 [Ask from a coding agent through MCP](#ask-from-a-coding-agent-through-mcp).
 
+**Check the switch after every upgrade of the app.** An upgrade can turn it off again: on the
+development site it was off after the upgrade to 4.3.0, and every tool then failed with "not
+allowed to expose its tools over the external MCP endpoint on this site".
+
 ### 6. Seed the demo release (optional)
 
 The steps below work on any project with a fix version: label a work item in it
@@ -465,7 +469,8 @@ Connect a client:
 
 1. A site admin opens [admin.atlassian.com](https://admin.atlassian.com), then the site,
    Connected apps, shipmill Release Decisions, Tools, and turns on **Expose tools to
-   MCP-compatible apps** (one switch for all the app's tools, off by default)
+   MCP-compatible apps** (one switch for all the app's tools, off by default). An upgrade of
+   the app can turn it off again, so check it after each one
 2. Each user opens the Release decisions panel in a project once and allows access
 3. Add the server to the client. It is `https://mcp.atlassian.com/forge/<app-id>`, for this
    app `https://mcp.atlassian.com/forge/e68108c0-f2e4-427b-9417-b3878322c288`; in Claude Code:
