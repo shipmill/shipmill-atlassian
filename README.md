@@ -183,11 +183,25 @@ mentioned, so the log notifies nobody.
 The app writes the page as itself, after the decision is recorded in Jira. The relay hands the
 decision to a `decision-log` queue and a consumer writes the row, so a failed write (a space
 deleted, a page whose table was removed, Confluence not on the site) is a failed consumer run
-in the app's logs and never undoes the decision. The space must be on the same site as Jira.
+in the app's logs and never undoes the decision. The space must be on the same site as Jira. Confluence allows two pages with one
+title in a space, so the queue writes one project's rows one at a time (a Forge concurrency
+key per project), and rows always go to the oldest page with the title.
 
 The log needs three Confluence scopes: `read:space:confluence`, `read:page:confluence` and
 `write:page:confluence`. **An install from before the log asks for consent again on upgrade**:
 until an admin approves the new scopes, the site keeps the version without the log.
+
+Forge lets the Jira app call Confluence only once the app is installed in Confluence on the
+same site as well, so turning the log on takes two steps: upgrade the Jira install, then
+install the app in Confluence. For the development environment:
+
+```bash
+forge install --upgrade -e development -s example.atlassian.net -p Jira
+```
+
+```bash
+forge install -e development -s example.atlassian.net -p Confluence
+```
 
 ## Decisions on pull requests
 

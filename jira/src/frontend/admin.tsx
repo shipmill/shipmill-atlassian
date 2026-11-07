@@ -13,7 +13,13 @@ function App() {
   const [spaceError, setSpaceError] = useState<string>();
 
   useEffect(() => {
-    call<Settings>('getSettings').then(setSettings, (e: Error) => setError(e.message));
+    call<Settings>('getSettings').then(
+      (loaded) => {
+        setSettings(loaded);
+        setSpace(loaded.logSpace ?? '');
+      },
+      (e: Error) => setError(e.message),
+    );
   }, []);
 
   if (error !== undefined) return <SectionMessage appearance="error"><Text>{error}</Text></SectionMessage>;
@@ -34,7 +40,7 @@ function App() {
     call<{ logSpace: string | null }>('setLogSpace', { space: value }).then(
       ({ logSpace }) => {
         setSettings({ ...settings, logSpace });
-        setSpace('');
+        setSpace(logSpace ?? '');
         setSpaceError(undefined);
       },
       (e: Error) => setSpaceError(e.message),
@@ -67,7 +73,7 @@ function App() {
         <Label labelFor="log-space">Space key</Label>
         <Textfield id="log-space" value={space} onChange={(e) => setSpace(e.target.value)} />
         <Inline space="space.100">
-          <Button onClick={() => saveSpace(space)} isDisabled={space.trim() === ''}>Save space</Button>
+          <Button onClick={() => saveSpace(space)} isDisabled={space.trim() === '' || space.trim() === settings.logSpace}>Save space</Button>
           {settings.logSpace !== null && <Button onClick={() => saveSpace(null)}>Turn off</Button>}
         </Inline>
         {spaceError !== undefined && <SectionMessage appearance="error"><Text>{spaceError}</Text></SectionMessage>}

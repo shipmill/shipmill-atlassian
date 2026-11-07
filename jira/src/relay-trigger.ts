@@ -6,7 +6,7 @@ import { commentId } from '@shipmill-atlassian/shared/release';
 import { askDecisions, type AskOutcome } from './ask';
 import { forgeConfluence, siteUrl } from './confluence';
 import { forgeDecisionJira } from './decision-jira';
-import { parseLoggedDecision, writeDecision, type DecisionLog } from './decision-log';
+import { parseLoggedDecision, queuedDecisionLog, writeDecision, type DecisionLog } from './decision-log';
 import { releaseDecisions } from './decisions';
 import { parseGraphLookups, preparerGraph, type ConsumerContext, type GraphLookups } from './graph';
 import { llmPreparer, templatePreparer, withGraph } from './prepare';
@@ -24,13 +24,10 @@ const relayQueue = new Queue({ key: RELAY_QUEUE });
 const prepareQueue = new Queue({ key: PREPARE_QUEUE });
 const logQueue = new Queue({ key: LOG_QUEUE });
 
-// A relayed decision goes to the Confluence log through its own queue: the decision is
-// already recorded in Jira, and a failed page write fails only the log consumer, in the logs
-export const queuedDecisionLog: DecisionLog = {
-  async record(decision) {
-    await logQueue.push({ body: decision });
-  },
-};
+// A relayed decision goes to the Confluence log through its own queue, one write per project
+// at a time: the decision is already recorded in Jira, and a failed page write fails only the
+// log consumer, in the logs
+export const forgeDecisionLog: DecisionLog = queuedDecisionLog((event) => logQueue.push(event));
 
 export async function onDecisionLog(event: { body: Record<string, unknown> }): Promise<void> {
   const decision = parseLoggedDecision(event.body, 'decision');
@@ -53,7 +50,7 @@ export async function onRelayReply(event: { body: Record<string, unknown> }): Pr
   const key = jiraKey(nonEmpty(event.body.key, 'key'));
   const reply = commentId(nonEmpty(event.body.commentId, 'commentId'));
   const reader = (await llmEnabled()) ? llmReplyReader(chat) : null;
-  const outcome = await relayReply(key, reply, { jira: forgeDecisionJira, reader, now: () => new Date(), log: queuedDecisionLog });
+  const outcome = await relayReply(key, reply, { jira: forgeDecisionJira, reader, now: () => new Date(), log: forgeDecisionLog });
   console.log(`relay ${key} comment ${reply}: ${JSON.stringify(outcome)}`);
 }
 
