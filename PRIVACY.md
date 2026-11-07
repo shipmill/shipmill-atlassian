@@ -5,9 +5,9 @@ For the shipmill Release Decisions apps for Jira and Bitbucket, as of 2026-11-04
 ## What the apps read
 
 The Jira app reads the work items, comments, labels and development information of the site
-it is installed on, and from the Teamwork Graph the pull requests, deployments and teams
-linked to a work item it asks a decision on, read as the person who presses Ask decisions on
-the release panel. The Bitbucket app reads the pull requests of the workspace it is installed
+it is installed on, and from the Teamwork Graph the pull requests and deployments linked to
+a work item it asks a decision on, read as the person who presses Ask decisions on the
+release panel. It asks for the graph's team scope but reads no teams yet. The Bitbucket app reads the pull requests of the workspace it is installed
 on. Both read only through Atlassian's own APIs, with the scopes the install screen shows.
 
 ## What the apps store
