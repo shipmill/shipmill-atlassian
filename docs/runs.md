@@ -36,3 +36,23 @@ against the authorization server the MCP server names.
 external MCP endpoint on this site". The switch **Expose tools to MCP-compatible apps** was
 off after the app's upgrade to 4.3.0: an upgrade can reset it, so an admin has to check it
 after every upgrade (now in the README). Waiting for it to be turned on again.
+
+## Merge check holds (2026-11-07)
+
+The Bitbucket app logs each merge check's verdict since 3.11.0 (`merge check harbor-demo #5
+at <head> (<trigger>): pass|hold <kinds>; ...`), since Bitbucket has no API that reads a
+Forge check's result back. The plan: drive each hold by pushing commits to a pull request's
+branch. A commit gets its build status on a temporary branch before the pull request's branch
+moves to it, so the check sees the status when the push triggers it.
+
+**Blocked:** a push to `harbor-demo` #5's branch (head `8531a503dc1a`, 21:01 UTC) ran the
+pull request trigger, but no merge check ran. `on-merge-check` has no invocation on the
+development install at all. Custom merge checks must first be turned on by a workspace
+admin and the check added to the repository (see "The merge check and the pull request
+card"). Waiting for that.
+
+**Breaking-change hold:** the block can be verified live; the lift needs the decider (the
+work item's assignee) to approve the pull request. On `harbor-demo`, Roman is both the
+author of every pull request and the only account, and Bitbucket does not let an author
+approve their own pull request. So the lift needs a second account; until then it is covered
+by tests (`bitbucket/src/holds.test.ts`).
