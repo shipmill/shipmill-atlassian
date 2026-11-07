@@ -26,7 +26,9 @@ Nowhere outside Atlassian. The apps run on Atlassian's Forge platform. When Clau
 Jira app sends work item text and replies to its questions to Forge LLMs, which Atlassian hosts; switch it off on the app's
 settings page and nothing is sent. The Bitbucket app sends pull request titles and links, and
 the replies the person asked makes to a decision on a pull request, to the Jira app it is
-paired with, through that app's Forge web trigger. The authors of the apps
+paired with, through that app's Forge web trigger. If a site admin exposes the Jira app's
+tools to MCP-compatible apps, an MCP client a person signs in to through Atlassian receives the
+release decisions that person may see in Jira, and nothing else. The authors of the apps
 receive no data from your site: no analytics, no tracking, no copies.
 
 ## Removing data

@@ -1,5 +1,5 @@
 import type { JiraKey, ProjectKey } from '@shipmill-atlassian/shared/jira-key';
-import { boolean, list, nonEmpty, object } from '@shipmill-atlassian/shared/parse';
+import { ParseError, boolean, list, nonEmpty, object } from '@shipmill-atlassian/shared/parse';
 import type { LinkedPullRequest } from '@shipmill-atlassian/shared/pull-requests';
 import type { Person, Release } from '@shipmill-atlassian/shared/release';
 import type { DecisionJira } from './decision-jira';
@@ -86,4 +86,8 @@ export function parseFixVersions(value: unknown, path: string): FixVersion[] {
 
 export function openVersions(versions: readonly FixVersion[]): string[] {
   return versions.filter((version) => !version.released && !version.archived).map((version) => version.name);
+}
+
+export function checkOpen(project: ProjectKey, versions: readonly string[], version: string): void {
+  if (!versions.includes(version)) throw new ParseError('version', `${JSON.stringify(version)} is not an open fix version of ${project}`);
 }
