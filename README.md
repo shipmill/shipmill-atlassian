@@ -189,6 +189,18 @@ The log needs three Confluence scopes: `read:space:confluence`, `read:page:confl
 `write:page:confluence`. **An install from before the log asks for consent again on upgrade**:
 until an admin approves the new scopes, the site keeps the version without the log.
 
+Forge lets the Jira app call Confluence only once the app is installed in Confluence on the
+same site as well, so turning the log on takes two steps: upgrade the Jira install, then
+install the app in Confluence. For the development environment:
+
+```bash
+forge install --upgrade -e development -s example.atlassian.net -p Jira
+```
+
+```bash
+forge install -e development -s example.atlassian.net -p Confluence
+```
+
 ## Decisions on pull requests
 
 When the work item a pull request names waits on a question the Jira app asked, the
