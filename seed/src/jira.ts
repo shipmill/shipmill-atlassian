@@ -1,20 +1,22 @@
 // Reads and writes the demo project on a Jira site through REST v3
 
 import { paragraphs } from '@shipmill-atlassian/shared/adf';
-import { adfText } from './adf-text';
-import { PROJECT_NAME, type SeedItem } from './demo';
+import type { SeedItem } from './demo';
 import { Http, list, record, text } from './http';
-import type { JiraAction, JiraState } from './plan';
+import type { ItemState, JiraAction, JiraState } from './plan';
 
 // A project property maps each seed item id to the id of the work item made for it. JQL
 // search is eventually consistent, so a second run right after the first could miss new work
 // items; a property and work items read by id are not
 const MANIFEST = 'shipmill-seed';
 const TEMPLATE = 'com.pyxis.greenhopper.jira:gh-simplified-kanban-classic';
+// Where the Jira app records what it asked on a work item (jira/src/decision-state.ts)
+export const DECISION_PROPERTY = 'shipmill-decision';
 
 export class Jira {
   readonly #http: Http;
   readonly #key: string;
+  readonly #name: string;
   #projectId: string | undefined;
   readonly #versionIds = new Map<string, string>();
   // Seed item id to work item id, as the manifest stores it
@@ -22,9 +24,10 @@ export class Jira {
   // Seed item id to work item key
   readonly #keys = new Map<string, string>();
 
-  constructor(site: string, email: string, token: string, projectKey: string) {
+  constructor(site: string, email: string, token: string, projectKey: string, projectName: string) {
     this.#http = new Http(`https://${site}/`, email, token);
     this.#key = projectKey;
+    this.#name = projectName;
   }
 
   get keys(): ReadonlyMap<string, string> {
@@ -34,9 +37,13 @@ export class Jira {
   async read(items: readonly SeedItem[]): Promise<JiraState> {
     const project = await this.#http.find(`rest/api/3/project/${this.#key}`);
     if (project === undefined) {
-      return { project: false, versions: new Set(), items: new Map(), comments: new Map() };
+      return { project: false, versions: new Set(), items: new Map() };
     }
-    this.#projectId = text(record(project, 'project').id, 'project id');
+    const fields = record(project, 'project');
+    this.#projectId = text(fields.id, 'project id');
+    if (fields.name !== this.#name) {
+      throw new Error(`project ${this.#key} is named ${JSON.stringify(fields.name)}, not ${JSON.stringify(this.#name)}`);
+    }
 
     const versions = list(await this.#http.get(`rest/api/3/project/${this.#key}/versions`), 'versions');
     for (const version of versions) {
@@ -46,25 +53,25 @@ export class Jira {
 
     const property = await this.#http.find(`rest/api/3/project/${this.#key}/properties/${MANIFEST}`);
     const stored = property === undefined ? {} : record(record(property, 'manifest').value, 'manifest value');
-    const comments = new Map<string, string[]>();
+    const found = new Map<string, ItemState>();
     for (const item of items) {
       const id = stored[item.id];
       if (id === undefined) {
         continue;
       }
       // A work item deleted since is made again
-      const issue = await this.#http.find(`rest/api/3/issue/${text(id, `manifest ${item.id}`)}?fields=summary`);
+      const issue = await this.#http.find(
+        `rest/api/3/issue/${text(id, `manifest ${item.id}`)}?fields=labels,fixVersions,comment&properties=${DECISION_PROPERTY}`,
+      );
       if (issue === undefined) {
         continue;
       }
-      const key = text(record(issue, 'work item').key, 'work item key');
+      const state = itemState(issue);
       this.#manifest.set(item.id, text(id, 'work item id'));
-      this.#keys.set(item.id, key);
-      if (item.comments.length > 0) {
-        comments.set(key, await this.#comments(key));
-      }
+      this.#keys.set(item.id, state.key);
+      found.set(item.id, state);
     }
-    return { project: true, versions: new Set(this.#versionIds.keys()), items: new Map(this.#keys), comments };
+    return { project: true, versions: new Set(this.#versionIds.keys()), items: found };
   }
 
   async apply(action: JiraAction, version: string): Promise<void> {
@@ -75,14 +82,23 @@ export class Jira {
         return this.#createVersion(action.name);
       case 'create-item':
         return this.#createItem(action.item, version);
-      case 'add-comment': {
-        const key = this.#keys.get(action.itemId);
-        if (key === undefined) {
-          throw new Error(`no work item for seed item ${action.itemId}`);
-        }
-        await this.#http.send('POST', `rest/api/3/issue/${key}/comment`, { body: paragraphs([action.text]) }, [201]);
+      case 'reset-fields':
+        await this.#http.send(
+          'PUT',
+          `rest/api/3/issue/${action.key}`,
+          { fields: { labels: [...action.labels], fixVersions: [{ id: this.#versionId(version) }] } },
+          [204],
+        );
         return;
-      }
+      case 'clear-question':
+        // The record first: once it is gone the app asks again, whatever comments are left
+        if (action.asked) {
+          await this.#http.delete(`rest/api/3/issue/${action.key}/properties/${DECISION_PROPERTY}`, [204]);
+        }
+        for (const comment of action.comments) {
+          await this.#http.delete(`rest/api/3/issue/${action.key}/comment/${comment}`, [204]);
+        }
+        return;
     }
   }
 
@@ -93,7 +109,7 @@ export class Jira {
       'rest/api/3/project',
       {
         key: this.#key,
-        name: PROJECT_NAME,
+        name: this.#name,
         projectTypeKey: 'software',
         projectTemplateKey: TEMPLATE,
         leadAccountId: text(myself.accountId, 'account id'),
@@ -109,17 +125,14 @@ export class Jira {
     const created = await this.#http.send(
       'POST',
       'rest/api/3/version',
-      { name, projectId: Number(this.#requireProject()), description: `${PROJECT_NAME} ${name}` },
+      { name, projectId: Number(this.#requireProject()), description: `${this.#name} ${name}` },
       [201],
     );
     this.#versionIds.set(name, text(record(created, 'created version').id, 'version id'));
   }
 
   async #createItem(item: SeedItem, version: string): Promise<void> {
-    const versionId = this.#versionIds.get(version);
-    if (versionId === undefined) {
-      throw new Error(`fix version ${version} does not exist`);
-    }
+    const versionId = this.#versionId(version);
     const created = record(
       await this.#http.send(
         'POST',
@@ -150,14 +163,12 @@ export class Jira {
     );
   }
 
-  async #comments(key: string): Promise<string[]> {
-    const page = record(await this.#http.get(`rest/api/3/issue/${key}/comment?maxResults=100`), 'comments');
-    const total = page.total;
-    const comments = list(page.comments, 'comments');
-    if (typeof total !== 'number' || total > comments.length) {
-      throw new Error(`${key} has more comments than one page; the seed reads one page`);
+  #versionId(version: string): string {
+    const id = this.#versionIds.get(version);
+    if (id === undefined) {
+      throw new Error(`fix version ${version} does not exist`);
     }
-    return comments.map((comment) => adfText(record(comment, 'comment').body));
+    return id;
   }
 
   #requireProject(): string {
@@ -166,4 +177,26 @@ export class Jira {
     }
     return this.#projectId;
   }
+}
+
+// A work item as GET issue returns it with labels, fix versions, comments and the decision property
+export function itemState(issue: unknown): ItemState {
+  const body = record(issue, 'work item');
+  const key = text(body.key, 'work item key');
+  const fields = record(body.fields, `${key} fields`);
+  const page = record(fields.comment, `${key} comments`);
+  const comments = list(page.comments, `${key} comments`);
+  if (page.total !== comments.length) {
+    throw new Error(`${key} has ${String(page.total)} comments but the response carries ${comments.length}`);
+  }
+  const properties = body.properties === undefined ? {} : record(body.properties, `${key} properties`);
+  return {
+    key,
+    labels: list(fields.labels, `${key} labels`).map((label) => text(label, `${key} label`)),
+    fixVersions: list(fields.fixVersions, `${key} fix versions`).map((version) =>
+      text(record(version, `${key} fix version`).name, `${key} fix version name`),
+    ),
+    comments: comments.map((comment) => text(record(comment, `${key} comment`).id, `${key} comment id`)),
+    asked: DECISION_PROPERTY in properties,
+  };
 }

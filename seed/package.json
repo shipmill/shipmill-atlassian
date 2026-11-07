@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "seed": "node --import tsx src/main.ts"
+    "seed": "node --env-file-if-exists=../tmp/seed.env --import tsx src/main.ts"
   },
   "dependencies": {
     "@shipmill-atlassian/shared": "*"

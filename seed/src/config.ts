@@ -2,21 +2,23 @@
 // the secrets, and anything malformed stops the run before a request is made
 
 import { parseArgs } from 'node:util';
-import { DEFAULT_PROJECT_KEY, DEFAULT_REPOSITORY } from './demo';
+import { DEFAULT_PROJECT_KEY, DEFAULT_PROJECT_NAME, DEFAULT_REPOSITORY } from './demo';
 
 export const ENV_EMAIL = 'ATLASSIAN_EMAIL';
 export const ENV_JIRA_TOKEN = 'JIRA_API_TOKEN';
 export const ENV_BITBUCKET_TOKEN = 'BITBUCKET_API_TOKEN';
 
 export const USAGE = `Usage: npm run seed -- --jira-site <name>.atlassian.net --bitbucket-workspace <workspace>
-       [--project-key ${DEFAULT_PROJECT_KEY}] [--repository ${DEFAULT_REPOSITORY}] [--dry-run]
+       [--project-key ${DEFAULT_PROJECT_KEY}] [--project-name ${DEFAULT_PROJECT_NAME}] [--repository ${DEFAULT_REPOSITORY}] [--dry-run]
 
-Environment: ${ENV_EMAIL}, ${ENV_JIRA_TOKEN}, ${ENV_BITBUCKET_TOKEN}`;
+Environment: ${ENV_EMAIL}, ${ENV_JIRA_TOKEN}, ${ENV_BITBUCKET_TOKEN}, from the shell or from
+tmp/seed.env at the repository root (git-ignored); the shell wins`;
 
 export type Config = {
   jiraSite: string;
   workspace: string;
   projectKey: string;
+  projectName: string;
   repository: string;
   dryRun: boolean;
   email: string;
@@ -27,6 +29,7 @@ export type Config = {
 const JIRA_SITE = /^[a-z0-9][a-z0-9-]*\.atlassian\.net$/;
 const WORKSPACE = /^[a-z0-9][a-z0-9_-]*$/;
 const PROJECT_KEY = /^[A-Z][A-Z0-9]{1,9}$/;
+const PROJECT_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]{1,79}$/;
 const REPOSITORY = /^[a-z0-9][a-z0-9._-]*$/;
 const EMAIL = /^[^@\s]+@[^@\s]+$/;
 
@@ -39,6 +42,7 @@ export function parseConfig(argv: readonly string[], env: Readonly<Record<string
       'jira-site': { type: 'string' },
       'bitbucket-workspace': { type: 'string' },
       'project-key': { type: 'string', default: DEFAULT_PROJECT_KEY },
+      'project-name': { type: 'string', default: DEFAULT_PROJECT_NAME },
       repository: { type: 'string', default: DEFAULT_REPOSITORY },
       'dry-run': { type: 'boolean', default: false },
     },
@@ -50,6 +54,7 @@ export function parseConfig(argv: readonly string[], env: Readonly<Record<string
     jiraSite: match('--jira-site', values['jira-site'], JIRA_SITE),
     workspace: match('--bitbucket-workspace', values['bitbucket-workspace'], WORKSPACE),
     projectKey: match('--project-key', values['project-key'], PROJECT_KEY),
+    projectName: match('--project-name', values['project-name'], PROJECT_NAME),
     repository: match('--repository', values.repository, REPOSITORY),
     dryRun: values['dry-run'],
     email: match(ENV_EMAIL, env[ENV_EMAIL], EMAIL),
