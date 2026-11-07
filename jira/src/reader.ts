@@ -105,20 +105,29 @@ function person(value: unknown, path: string): Person | null {
   return value === null || value === undefined ? null : parsePerson(value, path);
 }
 
-// The search embeds the first comments only; past them the reader pages through the item's comments
+// The search embeds the first comments only; past them the reader pages through the item's comments.
+// Comments written by an app are left out: shipmill's own question repeats "Decision needed:",
+// and once a seed or an admin clears the item's record, the finder would otherwise take that
+// question as the decision's source and quote shipmill to itself
 async function comments(rest: JiraRest, key: JiraKey, embedded: Fields, path: string): Promise<Comment[]> {
   const total = natural(embedded.total, `${path}.total`);
-  const first = list(embedded.comments, `${path}.comments`, jiraComment);
-  if (first.length === total) return first;
-  const all: Comment[] = [];
+  const first = list(embedded.comments, `${path}.comments`, personComment);
+  if (first.length === total) return first.filter((comment) => comment !== null);
+  const all: (Comment | null)[] = [];
   while (all.length < total) {
     const at = `comments(${key}, ${all.length})`;
     const page = object(await rest.comments(key, all.length, COMMENT_PAGE), at);
-    const entries = list(page.comments, `${at}.comments`, jiraComment);
+    const entries = list(page.comments, `${at}.comments`, personComment);
     if (entries.length === 0) throw new Error(`${at}: Jira reported ${total} comments but returned none past ${all.length}`);
     all.push(...entries);
   }
-  return all;
+  return all.filter((comment) => comment !== null);
+}
+
+// A comment by a person, or null for one an app wrote (Jira's author.accountType "app")
+function personComment(value: unknown, path: string): Comment | null {
+  const author = object(object(value, path).author, `${path}.author`);
+  return author.accountType === 'app' ? null : jiraComment(value, path);
 }
 
 export function jiraComment(value: unknown, path: string): Comment {

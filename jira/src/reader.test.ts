@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { jiraKey, projectKey } from '@shipmill-atlassian/shared/jira-key';
 import { RecordedJira, RecordedPullRequests, SEED_PROJECT, SEED_VERSION, seedRelease } from './fixtures';
+import { labelledDecisions } from './finder';
 import { readRelease, releaseJql } from './reader';
 
 test('reads every work item of the fix version across search pages', async () => {
@@ -67,6 +68,45 @@ test('pages through comments past the ones the search embeds', async () => {
   assert.deepEqual(release.items[0]?.comments.map((comment) => comment.text), ['comment 1', 'comment 2', 'comment 3']);
   assert.deepEqual(jira.calls, [0, 2]);
   assert.equal(release.items[0]?.description, '');
+});
+
+test('leaves out comments an app wrote, so a cleared item is asked from its own text again', async () => {
+  const dana = { accountId: 'dana', displayName: 'Dana Okafor', accountType: 'atlassian' };
+  const app = { accountId: 'app', displayName: 'shipmill Release Decisions for Jira', accountType: 'app' };
+  const body = (text: string) => ({ type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] });
+  const comment = (id: number, author: object, text: string) => ({ id: String(id), author, body: body(text), created: '2026-11-03T09:00:00.000+0000' });
+  const issue = {
+    key: 'DEMO-9',
+    fields: {
+      summary: 'Sign in with Okta SSO',
+      description: body('Decision needed: require Okta sign-in for every member, or let each member choose?'),
+      status: { name: 'To Do', statusCategory: { key: 'new' } },
+      labels: ['needs-decision'],
+      assignee: dana,
+      reporter: dana,
+      issuelinks: [],
+      comment: {
+        comments: [
+          comment(1, dana, 'Pilot customers disagree on the default.'),
+          comment(2, app, '@Dana Okafor Decision needed: require Okta sign-in for every member, or let each member choose? 1. Move DEMO-9 out of 2.4'),
+        ],
+        total: 2,
+        startAt: 0,
+        maxResults: 2,
+      },
+    },
+  };
+  const jira = {
+    async search() {
+      return { issues: [issue], isLast: true };
+    },
+    async comments() {
+      throw new Error('not called');
+    },
+  };
+  const release = await readRelease(jira, { forItem: async () => [] }, projectKey('DEMO'), '2.4');
+  assert.deepEqual(release.items[0]?.comments.map((entry) => entry.id), ['1']);
+  assert.deepEqual(labelledDecisions(release.items).map((decision) => decision.evidence), [{ kind: 'description' }]);
 });
 
 test('fails on a work item out of shape instead of skipping it', async () => {
