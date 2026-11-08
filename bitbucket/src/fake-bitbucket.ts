@@ -81,9 +81,11 @@ export class FakeQuestions implements QuestionStore {
   }
 
   async swap(pullRequest: PullRequestRef, question: PullRequestQuestion): Promise<PullRequestQuestion | undefined> {
-    const previous = await this.get(pullRequest);
-    await this.set(pullRequest, question);
-    return previous;
+    // One step, as KVS does it: nothing can run between the read and the write
+    const key = storageKey(pullRequest);
+    const stored = this.values.get(key);
+    this.values.set(key, JSON.parse(JSON.stringify(question)));
+    return stored === undefined ? undefined : parsePullRequestQuestion(stored, key);
   }
 
   async set(pullRequest: PullRequestRef, question: PullRequestQuestion): Promise<void> {

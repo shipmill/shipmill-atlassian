@@ -87,10 +87,12 @@ export function workItemAri(cloudId: string, issueId: string): string {
   return `ari:cloud:jira:${cloudId}:issue/${issueId}`;
 }
 
-// A consumer's installContext, "ari:cloud:jira::site/<cloudId>", to the cloud id
+// A consumer's installContext to the cloud id. Usually "ari:cloud:jira::site/<cloudId>"; an MCP
+// call on a site where the app is also installed in Confluence (for the decision log) arrives
+// on the Confluence install, as "ari:cloud:confluence::site/<cloudId>", the same site id
 export function siteCloudId(installContext: string): string {
-  const match = /^ari:cloud:jira::site\/([0-9a-f-]{36})$/.exec(installContext);
-  if (match?.[1] === undefined) throw new GraphError(`not a Jira site context: ${JSON.stringify(installContext)}`);
+  const match = /^ari:cloud:(?:jira|confluence)::site\/([0-9a-f-]{36})$/.exec(installContext);
+  if (match?.[1] === undefined) throw new GraphError(`not a site context: ${JSON.stringify(installContext)}`);
   return match[1];
 }
 

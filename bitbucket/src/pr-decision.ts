@@ -38,8 +38,12 @@ function same(record: PullRequestQuestion | undefined, key: JiraKey, view: { que
   return record !== undefined && record.key === key && record.questionId === view.questionId;
 }
 
+function claimed(record: PullRequestQuestion): boolean {
+  return record.status === 'asking' || record.status === 'relaying';
+}
+
 function live(record: PullRequestQuestion, now: Date): boolean {
-  return record.status !== 'asking' || now.getTime() - Date.parse(record.at) < STALE_CLAIM_MS;
+  return !claimed(record) || now.getTime() - Date.parse(record.at) < STALE_CLAIM_MS;
 }
 
 // Brings the pull request's question in line with Jira's
@@ -55,9 +59,9 @@ export async function syncQuestion(deps: QuestionDeps, pullRequest: PullRequest)
       if (same(record, key, view) && live(record, deps.now())) return 'already-asked';
       return ask(deps, ref, key, view);
     case 'decided':
-      if (!same(record, key, view) || record.status !== 'waiting') return 'up-to-date';
-      await recordAnswer(deps, ref, record, view.decider, view.answer, 'in Jira');
-      return 'resolved';
+      if (!same(record, key, view)) return 'up-to-date';
+      if (record.status !== 'waiting' && (record.status !== 'relaying' || live(record, deps.now()))) return 'up-to-date';
+      return (await recordAnswer(deps, ref, record, view.decider, view.answer, 'in Jira')) ? 'resolved' : 'up-to-date';
   }
 }
 
@@ -93,10 +97,20 @@ async function recordAnswer(
   decider: Person,
   answer: string,
   where: string,
-): Promise<void> {
+): Promise<boolean> {
+  // A push fires the pull request event and the merge check together: of the invocations that
+  // read the same waiting record, only the one that swaps it out posts the relay
+  const claim: PullRequestQuestion = { ...record, status: 'relaying', at: deps.now().toISOString() };
+  const replaced = await deps.store.swap(ref, claim);
+  if (replaced?.status === 'decided') {
+    await deps.store.set(ref, replaced);
+    return false;
+  }
+  if (replaced?.status === 'relaying' && live(replaced, deps.now())) return false;
   await deps.rest.postComment(ref.id, relayBody(decider, answer, where));
   await deps.rest.resolveTask(ref.id, record.taskId);
   await deps.store.set(ref, { ...record, status: 'decided', at: deps.now().toISOString() });
+  return true;
 }
 
 export type CommentOutcome = 'relayed' | 'no-question' | 'not-waiting' | 'not-newer' | 'not-decider' | 'empty' | ReplyReason;

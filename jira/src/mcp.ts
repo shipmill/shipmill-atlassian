@@ -10,7 +10,7 @@ import type { PanelView } from './panel-resolver';
 import { requirePermissions, type CallerPermissions } from './permissions';
 import type { Preparer } from './prepare';
 import { answerText } from './relay';
-import { checkOpen } from './release-panel';
+import { checkOpen, type ReleasePanel } from './release-panel';
 
 // The tools a coding agent calls through MCP (the rovo:mcp module over three Rovo actions):
 // list a release's blocking decisions, ask one, and read its answer. Each is the release
@@ -39,12 +39,37 @@ export function parseListInput(payload: unknown): ListInput {
   return { project: projectKey(nonEmpty(fields.project, 'project')), version: optionalText(fields.version, 'version') };
 }
 
+// Linked pull requests and the decisions opened on them live in the Jira install's Forge
+// storage, and storage is per install. Where the app is also installed in Confluence (for the
+// decision log), Atlassian serves MCP calls from that install, which reads none of it.
+export function seesPullRequestData(installContext: string): boolean {
+  return installContext.startsWith('ari:cloud:jira::site/');
+}
+
+// `ready` is 'unknown' when no work item blocks but the pull requests could not be read: a
+// decision opened on a pull request may still hold the release, so true would be a false claim
+export type ListedPanel = Omit<ReleasePanel, 'ready'> & { ready: boolean | 'unknown'; pullRequestData: 'read' | 'unavailable' };
+export type ListView = { versions: string[]; panel: ListedPanel | null };
+
+export function listedView(view: PanelView, seesPullRequests: boolean): ListView {
+  if (view.panel === null) return { versions: view.versions, panel: null };
+  if (seesPullRequests) return { versions: view.versions, panel: { ...view.panel, pullRequestData: 'read' } };
+  return {
+    versions: view.versions,
+    panel: { ...view.panel, ready: view.panel.decisions.length > 0 ? false : 'unknown', pullRequestData: 'unavailable' },
+  };
+}
+
 export async function listDecisions(
   input: ListInput,
-  deps: { permissions: CallerPermissions; view: (project: ProjectKey, version: string | undefined) => Promise<PanelView> },
-): Promise<PanelView> {
+  deps: {
+    permissions: CallerPermissions;
+    view: (project: ProjectKey, version: string | undefined) => Promise<PanelView>;
+    seesPullRequests: boolean;
+  },
+): Promise<ListView> {
   await requirePermissions(deps.permissions, { project: input.project }, ['BROWSE_PROJECTS']);
-  return deps.view(input.project, input.version);
+  return listedView(await deps.view(input.project, input.version), deps.seesPullRequests);
 }
 
 // read-decision-answer

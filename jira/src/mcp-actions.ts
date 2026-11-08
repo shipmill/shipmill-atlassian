@@ -2,8 +2,8 @@ import { nonEmpty, object } from '@shipmill-atlassian/shared/parse';
 import { forgeDecisionJira } from './decision-jira';
 import { forgeUserGraph, siteCloudId, siteGraph } from './graph';
 import { forgeIssueRest, userJiraRest } from './jira-rest';
-import { askDecision, callerAccountId, listDecisions, parseAskInput, parseItemInput, parseListInput, readAnswer, type AskResult, type DecisionView } from './mcp';
-import { openFixVersions, panelView, type PanelView } from './panel-resolver';
+import { askDecision, callerAccountId, listDecisions, parseAskInput, parseItemInput, parseListInput, readAnswer, seesPullRequestData, type AskResult, type DecisionView, type ListView } from './mcp';
+import { openFixVersions, panelView } from './panel-resolver';
 import { forgeCallerPermissions } from './permissions';
 import { templatePreparer, withGraph } from './prepare';
 import { kvsPullRequests } from './pull-request-store';
@@ -12,21 +12,22 @@ import { readRelease } from './reader';
 // The Rovo actions behind the rovo:mcp module, wired to Forge. Each runs for the MCP caller
 // (context.principal): reads go as them, writes as the app once Jira says they may.
 
-function logCall(tool: string, accountId: string, input: object): void {
-  console.log(`mcp ${tool} by ${accountId}: ${JSON.stringify(input)}`);
+function logCall(tool: string, accountId: string, input: object, context: unknown): void {
+  // Forge storage is per install, so which install answers decides what the tool can see
+  console.log(`mcp ${tool} by ${accountId} on ${String(object(context, 'context').installContext)}: ${JSON.stringify(input)}`);
 }
 
-export async function mcpListDecisions(payload: unknown, context: unknown): Promise<PanelView> {
+export async function mcpListDecisions(payload: unknown, context: unknown): Promise<ListView> {
   const accountId = callerAccountId(context);
   const input = parseListInput(payload);
-  logCall('list', accountId, input);
-  return listDecisions(input, { permissions: forgeCallerPermissions, view: (project, version) => panelView(project, version, userJiraRest) });
+  logCall('list', accountId, input, context);
+  return listDecisions(input, { permissions: forgeCallerPermissions, view: (project, version) => panelView(project, version, userJiraRest), seesPullRequests: seesPullRequestData(nonEmpty(object(context, 'context').installContext, 'context.installContext')) });
 }
 
 export async function mcpAskDecision(payload: unknown, context: unknown): Promise<AskResult> {
   const accountId = callerAccountId(context);
   const input = parseAskInput(payload);
-  logCall('ask', accountId, input);
+  logCall('ask', accountId, input, context);
   const cloudId = siteCloudId(nonEmpty(object(context, 'context').installContext, 'context.installContext'));
   const result = await askDecision(input, {
     permissions: forgeCallerPermissions,
@@ -44,6 +45,6 @@ export async function mcpAskDecision(payload: unknown, context: unknown): Promis
 export async function mcpReadAnswer(payload: unknown, context: unknown): Promise<DecisionView> {
   const accountId = callerAccountId(context);
   const input = parseItemInput(payload);
-  logCall('answer', accountId, input);
+  logCall('answer', accountId, input, context);
   return readAnswer(input, { permissions: forgeCallerPermissions, jira: forgeDecisionJira });
 }

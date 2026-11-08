@@ -111,6 +111,15 @@ export function checkResult(facts: Facts): CheckResult {
   };
 }
 
+// One log line per merge check run, so a hold blocking and then lifting shows in the app's
+// logs (`forge logs`): Bitbucket offers no API that reads a Forge check's result back
+export function verdictLine(facts: Facts, trigger: string): string {
+  const found = holds(facts);
+  const verdict = found.length === 0 ? 'pass' : `hold ${[...new Set(found.map((hold) => hold.kind))].join(',')}`;
+  const detail = found.length === 0 ? 'clear to merge' : found.map((hold) => `${hold.kind}: ${hold.message}`).join('; ');
+  return `merge check ${facts.pullRequest.repositorySlug} #${facts.pullRequest.id} at ${short(facts.pullRequest.sourceCommit)} (${trigger}): ${verdict}; ${detail}`;
+}
+
 function waitsOn(found: Hold[]): string[] {
   return [...new Set(found.map((hold) => hold.waitsOn))];
 }

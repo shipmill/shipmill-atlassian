@@ -9,6 +9,100 @@ decisions, asks each one on its work item and relays the answer, and the Bitbuck
 the same decisions on pull requests and checks pull requests against them, and the release
 panel shows what a fix version still waits on.
 
+## Try it as a judge
+
+From nothing to a decision asked, answered and logged takes about fifteen minutes. You need an
+Atlassian Cloud site with Jira and Confluence, a Bitbucket Cloud workspace, and an
+organization admin on the site (step 1 asks for one).
+
+The install links come from the apps' production deploy and are added here with it:
+
+| App | Install link |
+|---|---|
+| shipmill Release Decisions for Jira (also installed in Confluence) | Added with the production deploy |
+| shipmill Release Decisions for Bitbucket | Added with the production deploy |
+
+### 1. Install in Jira, as an organization admin
+
+Open the Jira link, pick your site and Jira, and install. The consent screen lists the app's
+scopes, among them four read-only Teamwork Graph scopes (`read:graph:...`). **Only an
+organization admin can approve those**; with a site admin alone the install stops there.
+Approving them lets the app add a work item's pull requests and deployments to the
+question's evidence; without them it reads Jira alone.
+
+### 2. Install in Confluence, a separate install
+
+Open the same Jira link again and pick Confluence on the same site. Forge lets the Jira app
+write to Confluence only while the app is installed there too. Skip this step and the
+decision log stays off; everything else works.
+
+### 3. Install in Bitbucket and pair it with Jira
+
+1. Open the Bitbucket link and install it in your workspace
+2. In Jira, open Settings (the gear), Apps, then shipmill Release Decisions in the sidebar,
+   and choose **Generate secret**. The page shows the Jira address and the secret
+3. In Bitbucket, open the workspace settings, then shipmill Release Decisions under Apps,
+   paste the Jira address and the secret, and choose **Test and save**. It saves only once a
+   signed test message reaches Jira, so a green message means the apps are paired
+4. In the repository's settings, open Workflow, then Custom merge checks, choose Add check,
+   then shipmill Release Decisions and Main branch. **The check runs only once it is added.**
+   Adding it at workspace or project level needs Bitbucket Premium, so on a free plan add it
+   to each repository. If custom merge checks are off, a workspace admin turns them on in the
+   workspace settings first
+
+### 4. Choose the log space
+
+On the same Jira settings page, under Confluence decision log, enter the key of a
+Confluence space on the site (for example `SD`) and choose **Save space**. Each relayed
+decision then adds a row to the page "Release decisions: `<project key>`" in that space,
+which the first one creates. Leave the Claude switch above it off: the whole flow works on
+templates, and a switch that is on bills Forge LLM tokens.
+
+### 5. Turn on the MCP tools (optional)
+
+To ask decisions from a coding agent, a site admin opens
+[admin.atlassian.com](https://admin.atlassian.com), the site, Connected apps, shipmill
+Release Decisions, Tools, and turns on **Expose tools to MCP-compatible apps**. Then follow
+[Ask from a coding agent through MCP](#ask-from-a-coding-agent-through-mcp).
+
+**Turn the switch on for both installs**, the Jira one and the Confluence one: each has its
+own row under Connected apps. On the development site, with it on for Jira and off for
+Confluence, every tool failed with "not allowed to expose its tools over the external MCP
+endpoint on this site"; with both on, they worked at once.
+
+### 6. Seed the demo release (optional)
+
+The steps below work on any project with a fix version: label a work item in it
+`needs-decision` and write "A, or B?" in its description. For the full demo (20 work items,
+three decisions, a repository with eight pull requests), run the seed from a clone of this
+repository with your own tokens; see [Seed a demo release](#seed-a-demo-release). It makes
+project `HRB` with fix version `2.4` and repository `harbor`.
+
+### 7. What to try, in order
+
+1. **The release panel.** In the project, open Release decisions in the sidebar and allow
+   access the first time. It lists the decisions 2.4 waits on: the three labelled work
+   items, then the decision task on the migration pull request. Pull requests show as
+   `harbor #2` and so on
+2. **Ask.** Choose **Ask decisions**, then **Refresh**. Each labelled work item gets one
+   question comment that mentions the person who decides, with numbered options
+3. **The pull request.** Open the pull request for `HRB-2` in Bitbucket: the same question is
+   asked there with a `Decision needed:` task, and the shipmill Release Decisions merge check
+   shows "Did not pass". On a free plan that is advice: the Merge button stays enabled and
+   Bitbucket's banner still says the pull request is ready to merge, next to the failed check
+4. **Answer.** As the person mentioned, reply on the work item with a number, for example
+   `2`. Shortly after, shipmill posts "Decision by ..., relayed by shipmill", removes the
+   `needs-decision` label and adds a row to the log page in Confluence; the task on the pull
+   request resolves the next time the pull request is opened or checked. Answer one decision on its pull request instead, with a number in a
+   comment there, to see the same relay start from Bitbucket
+5. **The pull request's own decision.** Resolve the `Decision needed:` task on the migration
+   pull request, then open that pull request again; the panel stops listing it on Refresh
+6. **Ready to ship.** With every decision answered, the panel shows Ready to ship. The
+   decision holds leave the merge check on its next run; the check still holds a pull request
+   until a build reports green on its head commit, and the seed's repository has no pipeline
+7. **From a coding agent (if step 5 is done).** Ask the agent to list what 2.4 waits on, to
+   ask a decision, and to read its answer once you replied
+
 ## Layout
 
 | Path | What |
@@ -56,9 +150,11 @@ releases in (from `shipmill.toml`: the policy's branch feeds every lane but `hot
 where an admin marks the check Required, which needs Bitbucket Premium. Elsewhere the check
 and the card show the holds as advice, and their wording says so; neither claims a block.
 
-To turn it on, a workspace admin enables custom merge checks in the workspace settings, then
-adds shipmill Release Decisions to a repository, project or the workspace with a branch
-pattern (for example `main`).
+To turn it on, with custom merge checks enabled in the workspace settings, open the
+repository's settings, then Workflow, Custom merge checks, Add check, shipmill Release
+Decisions, Main branch. Adding it to a project or the whole workspace needs Bitbucket Premium. Until it is added, the
+check never runs. It runs when code is pushed to the pull request, a reviewer's status
+changes or a merge starts; a build status arriving later does not run it again.
 
 ## Develop
 
@@ -194,6 +290,9 @@ by code; with the LLM off, any other reply gets a note asking for a number, and 
 a reply Claude reads as no decision yet (a question back, "let me check") keeps the wait
 without a note. A question asked with the LLM off is answered by number even if the switch
 is turned on later.
+
+Choosing the option to move the item records that decision; shipmill doesn't change the fix
+version itself, so someone moves the item in Jira.
 
 The release panel's Ask decisions button starts it for the picked fix version (see
 [The release panel](#the-release-panel)). In development the `dev` web trigger can start it
@@ -383,7 +482,8 @@ Connect a client:
 
 1. A site admin opens [admin.atlassian.com](https://admin.atlassian.com), then the site,
    Connected apps, shipmill Release Decisions, Tools, and turns on **Expose tools to
-   MCP-compatible apps** (one switch for all the app's tools, off by default)
+   MCP-compatible apps** (one switch for all the app's tools, off by default). Where the app
+   is also installed in Confluence for the decision log, turn it on for that install too
 2. Each user opens the Release decisions panel in a project once and allows access
 3. Add the server to the client. It is `https://mcp.atlassian.com/forge/<app-id>`, for this
    app `https://mcp.atlassian.com/forge/e68108c0-f2e4-427b-9417-b3878322c288`; in Claude Code:
@@ -395,6 +495,14 @@ Connect a client:
 4. Sign in with OAuth (in Claude Code, `/mcp`, then the server, then Authenticate, from an
    interactive terminal): the consent screen names the client and the app, you pick the site
    and allow access
+
+**Where the app is also installed in Confluence, the tools see less than the panel.** Atlassian
+serves the MCP calls from the Confluence install there, and Forge storage is per install, so
+`list-release-decisions` returns no linked pull requests and no decisions opened on pull
+requests. It says so: `pullRequestData` is `unavailable`, and `ready` is `unknown` when no work
+item blocks, since a pull request may still hold the release (`false` when one does). The work
+items' own decisions, asking and reading answers come from Jira and are complete. The release
+panel shows the whole picture.
 
 The tools carry the environment in their names: `list-release-decisions_development` from a
 development deploy, and so on.

@@ -51,9 +51,9 @@ modules:
       function: mcp-list-decisions
       actionVerb: GET
       description: >
-        List a Jira fix version's blocking decisions, oldest first: the question, who it waits
-        on, when shipmill asked (null if not yet) and linked pull requests. Also the project's
-        open fix versions; ready is true when nothing blocks.
+        List a Jira fix version's blocking decisions and the open fix versions. ready is true
+        when nothing blocks, false when something does, unknown when no work item blocks but
+        pull request data could not be read.
       inputs:
         project:
           title: Project key

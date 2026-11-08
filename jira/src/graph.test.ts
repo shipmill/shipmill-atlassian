@@ -169,6 +169,7 @@ test('the graph is read only where the prepare runs for a user', async () => {
     reason: 'the prepare runs for no user, and the Teamwork Graph answers only as one',
   });
   assert.equal(siteCloudId(site), CLOUD);
+  assert.equal(siteCloudId(`ari:cloud:confluence::site/${CLOUD}`), CLOUD);
   assert.throws(() => siteCloudId('ari:cloud:bitbucket::workspace/x'), GraphError);
   assert.throws(() => workItemAri(CLOUD, 'HRB-2'), GraphError);
 });
