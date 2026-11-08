@@ -44,10 +44,11 @@ decision log stays off; everything else works.
 3. In Bitbucket, open the workspace settings, then shipmill Release Decisions under Apps,
    paste the Jira address and the secret, and choose **Test and save**. It saves only once a
    signed test message reaches Jira, so a green message means the apps are paired
-4. In the Bitbucket workspace settings, under Merge checks, turn on custom merge checks if
-   they are off. Then, in the settings of the repository, add the check shipmill Release
-   Decisions for the main branch. **The check runs only once it is added.** Adding it at
-   workspace or project level needs Bitbucket Premium, so on a free plan add it per repository
+4. In the repository's settings, open Workflow, then Custom merge checks, choose Add check,
+   then shipmill Release Decisions and Main branch. **The check runs only once it is added.**
+   Adding it at workspace or project level needs Bitbucket Premium, so on a free plan add it
+   to each repository. If custom merge checks are off, a workspace admin turns them on in the
+   workspace settings first
 
 ### 4. Choose the log space
 
@@ -147,9 +148,9 @@ releases in (from `shipmill.toml`: the policy's branch feeds every lane but `hot
 where an admin marks the check Required, which needs Bitbucket Premium. Elsewhere the check
 and the card show the holds as advice, and their wording says so; neither claims a block.
 
-To turn it on, a workspace admin enables custom merge checks in the workspace settings, then
-adds shipmill Release Decisions to a repository with a branch pattern (for example `main`).
-Adding it to a project or the whole workspace needs Bitbucket Premium. Until it is added, the
+To turn it on, with custom merge checks enabled in the workspace settings, open the
+repository's settings, then Workflow, Custom merge checks, Add check, shipmill Release
+Decisions, Main branch. Adding it to a project or the whole workspace needs Bitbucket Premium. Until it is added, the
 check never runs. It runs when code is pushed to the pull request, a reviewer's status
 changes or a merge starts; a build status arriving later does not run it again.
 
