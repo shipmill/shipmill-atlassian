@@ -8,10 +8,12 @@ import {
   askDecision,
   callerAccountId,
   listDecisions,
+  listedView,
   parseAskInput,
   parseItemInput,
   parseListInput,
   readAnswer,
+  seesPullRequestData,
   McpInputError,
 } from './mcp';
 import { AccessError, parseMyPermissions, type CallerPermissions, type Permission, type PermissionTarget } from './permissions';
@@ -73,7 +75,7 @@ test('list returns the release panel for a caller who may browse the project, an
     versions: [SEED_VERSION],
     panel: await releasePanel({ ...release, project, version: version ?? SEED_VERSION }, new FakeJira(), []),
   });
-  const listed = await listDecisions({ project: SEED_PROJECT, version: undefined }, { permissions: new FakePermissions({ HRB: BROWSE }), view });
+  const listed = await listDecisions({ project: SEED_PROJECT, version: undefined }, { permissions: new FakePermissions({ HRB: BROWSE }), view, seesPullRequests: true });
   assert.deepEqual(listed.panel?.decisions.map((decision) => [decision.key, decision.askedAt]), [
     [HRB2, null],
     [HRB3, null],
@@ -82,10 +84,32 @@ test('list returns the release panel for a caller who may browse the project, an
 
   let viewed = false;
   await assert.rejects(
-    listDecisions({ project: SEED_PROJECT, version: undefined }, { permissions: new FakePermissions({}), view: async () => ((viewed = true), { versions: [], panel: null }) }),
+    listDecisions({ project: SEED_PROJECT, version: undefined }, { permissions: new FakePermissions({}), view: async () => ((viewed = true), { versions: [], panel: null }), seesPullRequests: true }),
     (error: unknown) => error instanceof AccessError && /BROWSE_PROJECTS on project HRB/.test(error.message),
   );
   assert.equal(viewed, false, 'nothing is read before the check');
+});
+
+test('list never claims ready when the pull requests could not be read', () => {
+  const clear = { project: SEED_PROJECT, version: SEED_VERSION, decisions: [], pullRequestDecisions: [], ready: true };
+  const onJira = listedView({ versions: [SEED_VERSION], panel: clear }, true);
+  assert.equal(onJira.panel?.ready, true);
+  assert.equal(onJira.panel?.pullRequestData, 'read');
+
+  const onConfluence = listedView({ versions: [SEED_VERSION], panel: clear }, false);
+  assert.equal(onConfluence.panel?.ready, 'unknown');
+  assert.equal(onConfluence.panel?.pullRequestData, 'unavailable');
+
+  // A work item's own decision holds the release whatever the pull requests say
+  const blocked = { ...clear, ready: false, decisions: [{ key: HRB2 }] } as unknown as typeof clear;
+  assert.equal(listedView({ versions: [SEED_VERSION], panel: blocked }, false).panel?.ready, false);
+
+  assert.equal(listedView({ versions: [], panel: null }, false).panel, null);
+});
+
+test('only a call on the Jira install sees the pull request data', () => {
+  assert.equal(seesPullRequestData('ari:cloud:jira::site/df3ece76-9d45-44c9-9e41-9c1a22e2fc59'), true);
+  assert.equal(seesPullRequestData('ari:cloud:confluence::site/df3ece76-9d45-44c9-9e41-9c1a22e2fc59'), false);
 });
 
 test('ask posts the template question as shipmill, records it, and does not ask twice', async () => {

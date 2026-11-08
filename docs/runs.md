@@ -39,10 +39,25 @@ against the authorization server the MCP server names.
 > access for this app.
 
 The first guess was that the upgrade to 4.3.0 had reset **Expose tools to MCP-compatible
-apps**. That is unproven: on 2026-11-08 the switch read Enabled on the Jira install and the
-same error stayed, on two tries, while the switch read Disabled on the Confluence install. The
-last working MCP call (2026-11-07 14:19 local) was before the app was installed in Confluence,
-so the Confluence install's switch is the current suspect; not yet tested.
+apps**; that was wrong. On 2026-11-08 the error stayed with the switch Enabled on the Jira
+install and Disabled on the Confluence install, and went away at once when the Confluence
+install was Enabled too. The last working call before that (2026-11-07 14:19 local) predates
+the app's Confluence install.
+
+**Found once MCP answered:** with the app installed in Jira and in Confluence, the calls run on
+the Confluence install (log line since Jira 4.5.0: `mcp list by ... on
+ari:cloud:confluence::site/...`). Two effects:
+
+- `ask-decision` failed before asking anything, since the site id parser took only Jira contexts.
+  Fixed, with a test; deployed as Jira 4.6.0
+- `list-release-decisions` reads no pull request links or pull request decisions, since those
+  live in the Jira install's Forge storage: `pullRequests` is empty and `ready` ignores open
+  pull request decisions. **Not fixed**; the README says so
+
+Whether a site with the app in Jira only serves MCP from the Jira install was not observed
+directly (the install context was not logged then, and no Jira-only site is at hand). Indirect
+evidence: the `list` of 2026-11-07 14:19, before the Confluence install, returned HRB's linked
+pull requests, which only the Jira install's storage holds.
 
 ## Merge check holds (2026-11-08)
 
@@ -75,8 +90,15 @@ request, and Roman is both the decider and the author of every `harbor-demo` pul
 Whether Bitbucket lets an author approve their own pull request was not tried: this session's
 permission guard refused the attempt.
 
-**What the pull request shows, and whether the merge is stopped:** not observed yet; no browser
-here is signed in to Bitbucket. What the plan says, as seen in the Bitbucket settings by the
-person who added the check: the Required box is disabled ("Upgrade to premium to allow failed
-checks to prevent merges"), so on this workspace a failed check can't be Required. No merge was
-attempted, since a merged pull request can't be seeded again.
+**What the pull request shows, and whether the merge is stopped** (`harbor-demo` #2, seen
+read-only by the coordinating session on 2026-11-08; nothing clicked):
+
+- The merge check area reads "0 of 2 checks passed". shipmill Release Decisions shows "Did not
+  pass", with "shipmill advises waiting: DEMO-2 waits on a decision: ...", then that no build
+  has reported, and that this blocks the merge only where the check is Required (Bitbucket
+  Premium). "These will run on merge" lists the same check
+- **The merge is not stopped.** The Merge buttons stay enabled, and the top banner reads "This
+  pull request is ready to merge. All of the required pre-merge checks have passed", next to
+  the failed check. On this free plan a judge sees both
+- The Required box is disabled in the repository's settings ("Upgrade to premium to allow
+  failed checks to prevent merges"). No merge was attempted, so the on-merge run is untested

@@ -65,9 +65,10 @@ To ask decisions from a coding agent, a site admin opens
 Release Decisions, Tools, and turns on **Expose tools to MCP-compatible apps**. Then follow
 [Ask from a coding agent through MCP](#ask-from-a-coding-agent-through-mcp).
 
-**Check the switch after every upgrade of the app.** An upgrade can turn it off again: on the
-development site it was off after the upgrade to 4.3.0, and every tool then failed with "not
-allowed to expose its tools over the external MCP endpoint on this site".
+**Turn the switch on for both installs**, the Jira one and the Confluence one: each has its
+own row under Connected apps. On the development site, with it on for Jira and off for
+Confluence, every tool failed with "not allowed to expose its tools over the external MCP
+endpoint on this site"; with both on, they worked at once.
 
 ### 6. Seed the demo release (optional)
 
@@ -87,7 +88,8 @@ project `HRB` with fix version `2.4` and repository `harbor`.
    question comment that mentions the person who decides, with numbered options
 3. **The pull request.** Open the pull request for `HRB-2` in Bitbucket: the same question is
    asked there with a `Decision needed:` task, and the shipmill Release Decisions merge check
-   fails on it (as advice on a free workspace; see the merge check section)
+   shows "Did not pass". On a free plan that is advice: the Merge button stays enabled and
+   Bitbucket's banner still says the pull request is ready to merge, next to the failed check
 4. **Answer.** As the person mentioned, reply on the work item with a number, for example
    `2`. Shortly after, shipmill posts "Decision by ..., relayed by shipmill", removes the
    `needs-decision` label and adds a row to the log page in Confluence; the task on the pull
@@ -477,8 +479,8 @@ Connect a client:
 
 1. A site admin opens [admin.atlassian.com](https://admin.atlassian.com), then the site,
    Connected apps, shipmill Release Decisions, Tools, and turns on **Expose tools to
-   MCP-compatible apps** (one switch for all the app's tools, off by default). An upgrade of
-   the app can turn it off again, so check it after each one
+   MCP-compatible apps** (one switch for all the app's tools, off by default). Where the app
+   is also installed in Confluence for the decision log, turn it on for that install too
 2. Each user opens the Release decisions panel in a project once and allows access
 3. Add the server to the client. It is `https://mcp.atlassian.com/forge/<app-id>`, for this
    app `https://mcp.atlassian.com/forge/e68108c0-f2e4-427b-9417-b3878322c288`; in Claude Code:
@@ -490,6 +492,14 @@ Connect a client:
 4. Sign in with OAuth (in Claude Code, `/mcp`, then the server, then Authenticate, from an
    interactive terminal): the consent screen names the client and the app, you pick the site
    and allow access
+
+**Where the app is also installed in Confluence, the tools see less than the panel.** Atlassian
+serves the MCP calls from the Confluence install there, and Forge storage is per install, so
+`list-release-decisions` returns no linked pull requests and no decisions opened on pull
+requests. It says so: `pullRequestData` is `unavailable`, and `ready` is `unknown` when no work
+item blocks, since a pull request may still hold the release (`false` when one does). The work
+items' own decisions, asking and reading answers come from Jira and are complete. The release
+panel shows the whole picture.
 
 The tools carry the environment in their names: `list-release-decisions_development` from a
 development deploy, and so on.
