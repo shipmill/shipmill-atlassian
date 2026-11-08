@@ -14,25 +14,60 @@ Each run:
 5. Check the panel state through MCP `list`, the merge check on the pull requests, and the
    rows on the Confluence page "Release decisions: DEMO" in space `SD`
 
-## Run 1 (2026-11-07)
+## Results
 
-**Seed:** reset DEMO-2, DEMO-3 and DEMO-9 (their `shipmill-decision` record deleted, the
-`needs-decision` label and fix version put back); Bitbucket unchanged, the decision task on #4
-still open.
+All on 2026-11-08 UTC, LLM off, replies posted as the person asked. Run 1 used Jira 4.6.0 and
+Bitbucket 3.11.0; runs 2 and 3 used Jira 4.6.0 and Bitbucket 3.12.0.
 
-**Found before asking:** DEMO-9's question from the previous demo quoted shipmill's own
+| | Run 1 | Run 2 | Run 3 |
+|---|---|---|---|
+| Started | 08:24 | 08:32 | 08:35 |
+| Seed reset | ok | ok, task on #4 reopened | ok, task on #4 reopened |
+| `ask` on DEMO-2, -3, -9; a second ask of DEMO-2 is not asked again | ok | ok | ok |
+| Question cites the item's own description | ok | ok | ok |
+| Merge check while waiting, #2, #3, #4 | `hold decision,build` | `hold decision,build` | `hold decision,build` |
+| Question and task mirrored on #2, #3 | ok | ok | ok |
+| DEMO-2 / DEMO-3 / DEMO-9 answered with | 2 / 3 / 2 | 3 / 2 **on PR #3** / 3 | 1 / 2 / 1 |
+| All decided, label removed, relayed in Jira | ok | ok | ok |
+| Task on #4 resolved; merge check with a green build, #2, #3, #4 | `pass` | `pass` | `pass` |
+| Relay comments on #2 | **2, a bug** | 1 | 1 |
+| `list` after: no decisions left | ok | ok | ok |
+| New rows on "Release decisions: DEMO" (space `SD`) | 3 | 3 | 3 |
+
+**Reply on a pull request (run 2):** the comment `2` on #3 was relayed to Jira as "Answered on
+Bitbucket pull request #3 ...: option 2", removed DEMO-3's label, added its row to the log, and
+#3 got "Answered on this pull request" with its task resolved.
+
+**Found in the runs:**
+
+- **Duplicate relay comment (run 1).** A push fires the pull request event and the merge check
+  together, and both posted the relay. Fixed with an atomic claim and tests; Bitbucket 3.12.0.
+  Runs 2 and 3 posted one
+- **Option 1 does not move the work item (run 3).** "Move DEMO-2 out of 2.4" was recorded and
+  relayed, but the item stayed in fix version 2.4: the relay removes the label and records
+  the answer, and changes no fix version. Not changed; the README says so
+- **The log keeps its rows across seeds.** The seed leaves the Confluence page alone, so it grew
+  by three rows a run, on top of the two from 2026-11-07
+
+**State left:** DEMO is reseeded, each decision labelled and not asked. `harbor-demo` #2, #3 and
+#4 carry empty commits from these runs and a green build status on their heads, so they differ
+from a fresh seed there; the seed never touches a pull request's commits.
+
+## Findings before the runs (2026-11-07)
+
+**Seen before asking:** DEMO-9's question from the previous demo quoted shipmill's own
 earlier question as its evidence ("asked by shipmill Release Decisions for Jira in a
 comment"). The seed keeps comments, so after a reset the finder read the app's old question
 comment, which repeats "Decision needed:", as the decision's source. Fixed: the release
 reader leaves out comments whose author is an app (`accountType` `app`), with a regression
 test in `jira/src/reader.test.ts`; deployed to development as Jira 4.4.0.
 
-**Found on asking:** `scripts/mcp-check.py` asked for a new sign-in once the saved access
+**Seen on asking:** `scripts/mcp-check.py` asked for a new sign-in once the saved access
 token was older than eight hours, because the MCP client forgets a stored token's expiry and
 refreshes against the wrong endpoint. Fixed: the script keeps the expiry and refreshes
 against the authorization server the MCP server names.
 
-**Blocked:** every MCP tool then failed with:
+Every MCP tool then failed with:
 
 > App ari:cloud:ecosystem::app/e68108c0-f2e4-427b-9417-b3878322c288 is not allowed to expose
 > its tools over the external MCP endpoint on this site. An admin must enable external MCP
@@ -52,7 +87,10 @@ ari:cloud:confluence::site/...`). Two effects:
   Fixed, with a test; deployed as Jira 4.6.0
 - `list-release-decisions` reads no pull request links or pull request decisions, since those
   live in the Jira install's Forge storage: `pullRequests` is empty and `ready` ignores open
-  pull request decisions. **Not fixed**; the README says so
+  pull request decisions, and `ready` ignored open pull request decisions. The false `ready:
+  true` is fixed: since Jira 4.7.0 such a call reports `pullRequestData: unavailable` and
+  `ready: unknown` when no work item blocks, seen live on 2026-11-08. The missing data is
+  [#35](https://github.com/shipmill/shipmill-atlassian/issues/35)
 
 Whether a site with the app in Jira only serves MCP from the Jira install was not observed
 directly (the install context was not logged then, and no Jira-only site is at hand). Indirect
@@ -102,3 +140,12 @@ read-only by the coordinating session on 2026-11-08; nothing clicked):
   the failed check. On this free plan a judge sees both
 - The Required box is disabled in the repository's settings ("Upgrade to premium to allow
   failed checks to prevent merges"). No merge was attempted, so the on-merge run is untested
+
+## Not run live
+
+- The release panel's page and its Ask decisions button: no browser here is signed in, so the
+  panel's data was read through MCP `list`, whose pull request data is limited as above
+- The pull request card, and the pairing and settings pages
+- A merge, and so the check's on-merge run
+- The breaking-change lift (second account), the LLM switch on, a production deploy
+- The clean install from the README: needs a new site and workspace

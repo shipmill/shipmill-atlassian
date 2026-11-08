@@ -291,6 +291,9 @@ a reply Claude reads as no decision yet (a question back, "let me check") keeps 
 without a note. A question asked with the LLM off is answered by number even if the switch
 is turned on later.
 
+Choosing the option to move the item records that decision; shipmill doesn't change the fix
+version itself, so someone moves the item in Jira.
+
 The release panel's Ask decisions button starts it for the picked fix version (see
 [The release panel](#the-release-panel)). In development the `dev` web trigger can start it
 too: a signed `{"action":"prepare","project":"HRB","version":"2.4","llm":false}` asks the
