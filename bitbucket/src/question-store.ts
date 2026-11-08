@@ -9,7 +9,8 @@ import { commentId, parsePerson, timestamp, type CommentId, type Person } from '
 
 export type PullRequestQuestion = {
   // asking: claimed by one invocation, which posts the comment and the task next
-  status: 'asking' | 'waiting' | 'decided';
+  // relaying: likewise, for the relay comment and resolving the task
+  status: 'asking' | 'waiting' | 'relaying' | 'decided';
   key: JiraKey;
   questionId: CommentId;
   decider: Person;
@@ -34,7 +35,7 @@ export interface QuestionStore {
 export function parsePullRequestQuestion(value: unknown, path: string): PullRequestQuestion {
   const fields = object(value, path);
   return {
-    status: oneOf(fields.status, `${path}.status`, ['asking', 'waiting', 'decided'] as const),
+    status: oneOf(fields.status, `${path}.status`, ['asking', 'waiting', 'relaying', 'decided'] as const),
     key: jiraKey(nonEmpty(fields.key, `${path}.key`)),
     questionId: commentId(nonEmpty(fields.questionId, `${path}.questionId`)),
     decider: parsePerson(fields.decider, `${path}.decider`),

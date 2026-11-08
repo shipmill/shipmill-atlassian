@@ -179,6 +179,35 @@ test('an answer given in Jira resolves the task on the pull request', async () =
   assert.equal((await check(jira, rest)).success, true);
 });
 
+test('the pull request event and the merge check relaying at once post the answer once', async () => {
+  const { jira, rest, deps } = await seeded();
+  await syncQuestion(deps, SEEDED);
+  await relayReply(HRB2, jira.reply(HRB2, DANA, '1'), { jira, reader: null, now: NOW, log: new FakeLog() });
+
+  const outcomes = await Promise.all([syncQuestion(deps, SEEDED), syncQuestion(deps, SEEDED)]);
+  assert.deepEqual([...outcomes].sort(), ['resolved', 'up-to-date']);
+  assert.equal(rest.posted(2).filter((text) => text.startsWith('Decision by')).length, 1);
+  assert.deepEqual((await rest.tasks(2)).map((task) => task.state), ['RESOLVED']);
+});
+
+test('a relay claim left by a failed invocation is taken over once it is stale', async () => {
+  const { jira, rest, store, deps } = await seeded();
+  await syncQuestion(deps, SEEDED);
+  await relayReply(HRB2, jira.reply(HRB2, DANA, '1'), { jira, reader: null, now: NOW, log: new FakeLog() });
+  const ref = { repository: REPOSITORY, id: 2 };
+  const waiting = await store.get(ref);
+  if (waiting === undefined) throw new Error('expected the question on record');
+
+  await store.set(ref, { ...waiting, status: 'relaying', at: NOW().toISOString() });
+  assert.equal(await syncQuestion(deps, SEEDED), 'up-to-date', 'a live claim is left to its invocation');
+  assert.equal(rest.posted(2).filter((text) => text.startsWith('Decision by')).length, 0);
+
+  await store.set(ref, { ...waiting, status: 'relaying', at: new Date(NOW().getTime() - STALE_CLAIM_MS - 1).toISOString() });
+  assert.equal(await syncQuestion(deps, SEEDED), 'resolved');
+  assert.equal(rest.posted(2).filter((text) => text.startsWith('Decision by')).length, 1);
+  assert.equal((await store.get(ref))?.status, 'decided');
+});
+
 test('a reply on the pull request after Jira has the answer resolves the task there too', async () => {
   const { jira, rest, deps } = await seeded();
   await syncQuestion(deps, SEEDED);
