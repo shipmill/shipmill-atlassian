@@ -44,6 +44,10 @@ decision log stays off; everything else works.
 3. In Bitbucket, open the workspace settings, then shipmill Release Decisions under Apps,
    paste the Jira address and the secret, and choose **Test and save**. It saves only once a
    signed test message reaches Jira, so a green message means the apps are paired
+4. In the Bitbucket workspace settings, under Merge checks, turn on custom merge checks if
+   they are off. Then, in the settings of the repository, add the check shipmill Release
+   Decisions for the main branch. **The check runs only once it is added.** Adding it at
+   workspace or project level needs Bitbucket Premium, so on a free plan add it per repository
 
 ### 4. Choose the log space
 
@@ -90,8 +94,9 @@ project `HRB` with fix version `2.4` and repository `harbor`.
    comment there, to see the same relay start from Bitbucket
 5. **The pull request's own decision.** Resolve the `Decision needed:` task on the migration
    pull request, then open that pull request again; the panel stops listing it on Refresh
-6. **Ready to ship.** With every decision answered, the panel shows Ready to ship and the
-   merge check passes on the next run
+6. **Ready to ship.** With every decision answered, the panel shows Ready to ship. The
+   decision holds leave the merge check on its next run; the check still holds a pull request
+   until a build reports green on its head commit, and the seed's repository has no pipeline
 7. **From a coding agent (if step 5 is done).** Ask the agent to list what 2.4 waits on, to
    ask a decision, and to read its answer once you replied
 
@@ -143,8 +148,10 @@ where an admin marks the check Required, which needs Bitbucket Premium. Elsewher
 and the card show the holds as advice, and their wording says so; neither claims a block.
 
 To turn it on, a workspace admin enables custom merge checks in the workspace settings, then
-adds shipmill Release Decisions to a repository, project or the workspace with a branch
-pattern (for example `main`).
+adds shipmill Release Decisions to a repository with a branch pattern (for example `main`).
+Adding it to a project or the whole workspace needs Bitbucket Premium. Until it is added, the
+check never runs. It runs when code is pushed to the pull request, a reviewer's status
+changes or a merge starts; a build status arriving later does not run it again.
 
 ## Develop
 

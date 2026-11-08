@@ -32,27 +32,51 @@ token was older than eight hours, because the MCP client forgets a stored token'
 refreshes against the wrong endpoint. Fixed: the script keeps the expiry and refreshes
 against the authorization server the MCP server names.
 
-**Blocked:** every MCP tool then failed with "not allowed to expose its tools over the
-external MCP endpoint on this site". The switch **Expose tools to MCP-compatible apps** was
-off after the app's upgrade to 4.3.0: an upgrade can reset it, so an admin has to check it
-after every upgrade (now in the README). Waiting for it to be turned on again.
+**Blocked:** every MCP tool then failed with:
 
-## Merge check holds (2026-11-07)
+> App ari:cloud:ecosystem::app/e68108c0-f2e4-427b-9417-b3878322c288 is not allowed to expose
+> its tools over the external MCP endpoint on this site. An admin must enable external MCP
+> access for this app.
 
-The Bitbucket app logs each merge check's verdict since 3.11.0 (`merge check harbor-demo #5
-at <head> (<trigger>): pass|hold <kinds>; ...`), since Bitbucket has no API that reads a
-Forge check's result back. The plan: drive each hold by pushing commits to a pull request's
-branch. A commit gets its build status on a temporary branch before the pull request's branch
-moves to it, so the check sees the status when the push triggers it.
+The first guess was that the upgrade to 4.3.0 had reset **Expose tools to MCP-compatible
+apps**. That is unproven: on 2026-11-08 the switch read Enabled on the Jira install and the
+same error stayed, on two tries, while the switch read Disabled on the Confluence install. The
+last working MCP call (2026-11-07 14:19 local) was before the app was installed in Confluence,
+so the Confluence install's switch is the current suspect; not yet tested.
 
-**Blocked:** a push to `harbor-demo` #5's branch (head `8531a503dc1a`, 21:01 UTC) ran the
-pull request trigger, but no merge check ran. `on-merge-check` has no invocation on the
-development install at all. Custom merge checks must first be turned on by a workspace
-admin and the check added to the repository (see "The merge check and the pull request
-card"). Waiting for that.
+## Merge check holds (2026-11-08)
 
-**Breaking-change hold:** the block can be verified live; the lift needs the decider (the
-work item's assignee) to approve the pull request. On `harbor-demo`, Roman is both the
-author of every pull request and the only account, and Bitbucket does not let an author
-approve their own pull request. So the lift needs a second account; until then it is covered
-by tests (`bitbucket/src/holds.test.ts`).
+The Bitbucket app logs each merge check's verdict since 3.11.0, since Bitbucket has no API that
+reads a Forge check's result back. Until the check was added to the repository it never ran:
+a push on 2026-11-07 ran the pull request trigger only, and `on-merge-check` had no invocation
+in 14 days of logs. It was then added at repository level on `harbor-demo`, branch "Main
+branch", "Not required".
+
+**The check runs.** It reported on all eight open pull requests at 08:11:59 UTC, and then on
+every push.
+
+Each commit below got its build status on a temporary branch first, so the check saw the status
+when the push triggered it (a status arriving later does not run the check). Lines are from
+`forge logs -e development`, all with trigger `on-code-pushed`:
+
+| Hold | Pull request | Head | Verdict in the log |
+|---|---|---|---|
+| Build: none reported | #5 | `2a3bbb53ac5e` | `hold build; build: no build has reported on 2a3bbb53ac5e` |
+| Build: failed | #5 | `20efe9db415e` | `hold build; build: build harbor CI is failed on 20efe9db415e` |
+| Build: lifted (green) | #5 | `1128334ddb2c` | `pass; clear to merge` |
+| Breaking change, green build | #6 | `f11e979c07f8` | `hold breaking; breaking: the breaking change "Invoice PDFs render due dates in the account time zone" is undecided: Roman Medvedev has not approved it` |
+
+The test files were then removed from both branches again, so their content matches the seed;
+their heads carry no build status, as seeded.
+
+**Breaking-change hold:** block verified live; the lift needs a second account and is covered by
+tests (`bitbucket/src/holds.test.ts`). It lifts when the work item's decider approves the pull
+request, and Roman is both the decider and the author of every `harbor-demo` pull request.
+Whether Bitbucket lets an author approve their own pull request was not tried: this session's
+permission guard refused the attempt.
+
+**What the pull request shows, and whether the merge is stopped:** not observed yet; no browser
+here is signed in to Bitbucket. What the plan says, as seen in the Bitbucket settings by the
+person who added the check: the Required box is disabled ("Upgrade to premium to allow failed
+checks to prevent merges"), so on this workspace a failed check can't be Required. No merge was
+attempted, since a merged pull request can't be seeded again.
