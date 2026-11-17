@@ -7,7 +7,7 @@ import { openFixVersions, panelView } from './panel-resolver';
 import { forgeCallerPermissions } from './permissions';
 import { templatePreparer, withGraph } from './prepare';
 import { kvsPullRequests } from './pull-request-store';
-import { readRelease } from './reader';
+import { readAskedItem, readRelease } from './reader';
 
 // The Rovo actions behind the rovo:mcp module, wired to Forge. Each runs for the MCP caller
 // (context.principal): reads go as them, writes as the app once Jira says they may.
@@ -31,7 +31,10 @@ export async function mcpAskDecision(payload: unknown, context: unknown): Promis
   const cloudId = siteCloudId(nonEmpty(object(context, 'context').installContext, 'context.installContext'));
   const result = await askDecision(input, {
     permissions: forgeCallerPermissions,
+    caller: accountId,
     versions: openFixVersions,
+    // As the app, once Jira said the caller may browse and comment on the work item
+    item: (key) => readAskedItem(forgeIssueRest, key),
     release: (project, version) => readRelease(userJiraRest, kvsPullRequests, project, version),
     jira: forgeDecisionJira,
     // The graph answers as the caller, who allowed the app access once already

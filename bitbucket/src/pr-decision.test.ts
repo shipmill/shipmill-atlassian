@@ -4,7 +4,7 @@ import { decode, encode } from '@shipmill-atlassian/shared/bridge';
 import { parseDecisionView, parseReplyOutcome } from '@shipmill-atlassian/shared/decision';
 import { jiraKey, type JiraKey } from '@shipmill-atlassian/shared/jira-key';
 import type { WorkItemStatus } from '@shipmill-atlassian/shared/work-item';
-import { askDecisions } from '../../jira/src/ask';
+import { SHIPMILL, askDecisions } from '../../jira/src/ask';
 import { FakeJira, FakeLog } from '../../jira/src/fake-jira';
 import { seedRelease } from '../../jira/src/fixtures';
 import { findDecisions } from '../../jira/src/finder';
@@ -64,7 +64,7 @@ async function seeded(pullRequest = SEEDED) {
   const release = await seedRelease();
   const decisions = await findDecisions(release, { llm: false, implicit: { find: async () => [] } });
   const jira = new FakeJira();
-  await askDecisions(release, decisions, { jira, preparer: templatePreparer, now: NOW });
+  await askDecisions(release, decisions, { jira, preparer: templatePreparer, now: NOW, askedBy: SHIPMILL });
   const rest = new FakeRepository(pullRequest);
   const store = new FakeQuestions();
   const deps: QuestionDeps = { rest, store, decisions: bridged(jira), repository: REPOSITORY, now: NOW };
@@ -128,8 +128,8 @@ test('a seeded pull request asks, is answered, and clears', async () => {
     `Decision by @Dana Okafor, relayed by shipmill\nAnswered on Bitbucket pull request #2 (${SEEDED.url}): ${answer}`,
   );
   assert.deepEqual(jira.labels, [{ key: HRB2, present: false }]);
-  const state = jira.states.get(HRB2);
-  assert.deepEqual(state?.status === 'decided' ? state.answer : null, { kind: 'option', number: 2 });
+  const state = jira.current(HRB2);
+  assert.deepEqual(state?.status === 'answered' ? state.answer : null, { kind: 'option', number: 2 });
   assert.equal(rest.posted(2).at(-1), `Decision by \`@Dana Okafor\`, relayed by shipmill\n\nAnswered on this pull request: ${answer}`);
 
   // Clears: the task is resolved and the merge check passes
@@ -153,7 +153,7 @@ test('a pull request is asked once, however often it is synced', async () => {
 
 test('a fresh claim by another invocation holds back a second question; a stale one does not', async () => {
   const { jira, rest, store, deps } = await seeded();
-  const questionId = jira.states.get(HRB2)!.questionId;
+  const questionId = jira.current(HRB2)!.id;
   const claim = { status: 'asking' as const, key: HRB2, questionId, decider: DANA, options: 3, commentId: 0, taskId: 0, at: NOW().toISOString() };
   await store.set({ repository: REPOSITORY, id: 2 }, claim);
   assert.equal(await syncQuestion(deps, SEEDED), 'already-asked');
@@ -215,8 +215,8 @@ test('a reply on the pull request after Jira has the answer resolves the task th
   assert.equal(await relayPullRequestComment(deps, 2, rest.reply(2, DANA, '3')), 'decided');
   assert.deepEqual((await rest.tasks(2)).map((task) => task.state), ['RESOLVED']);
   // Jira kept the first answer
-  const state = jira.states.get(HRB2);
-  assert.deepEqual(state?.status === 'decided' ? state.answer : null, { kind: 'option', number: 1 });
+  const state = jira.current(HRB2);
+  assert.deepEqual(state?.status === 'answered' ? state.answer : null, { kind: 'option', number: 1 });
 });
 
 test('with the LLM off a reply without a number gets a note on the pull request and the question stays open', async () => {
@@ -229,7 +229,7 @@ test('with the LLM off a reply without a number gets a note on the pull request 
     'shipmill read no option number in the reply by `@Dana Okafor`. Reply with a number from 1 to 3; the decision stays open until then.',
   );
   assert.equal(jira.posted(HRB2).length, inJira);
-  assert.equal(jira.states.get(HRB2)?.status, 'waiting');
+  assert.equal(jira.current(HRB2)?.status, 'waiting');
   assert.deepEqual((await rest.tasks(2)).map((task) => task.state), ['UNRESOLVED']);
 });
 

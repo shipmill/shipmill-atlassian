@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { decode, encode, sign, BridgeError, type BridgeMessage } from './bridge';
-import { parseDecisionView, parseReplyOutcome } from './decision';
+import { optionLines, parseDecisionView, parseReplyOutcome } from './decision';
 import { jiraKey } from './jira-key';
 import { ParseError } from './parse';
 import { commentId } from './release';
@@ -14,6 +14,7 @@ const ASKED = {
   questionId: '20000',
   question: 'retire v1 tokens?',
   options: [{ text: 'Move HRB-2 out of 2.4', reason: 'ships now' }, { text: 'Retire them', reason: 'decided now' }],
+  recommended: 1,
   decider: { accountId: '712020:dana', displayName: 'Dana Okafor' },
   llm: false,
 };
@@ -25,6 +26,18 @@ test('reads a decision view and refuses one out of shape', () => {
   assert.throws(() => parseDecisionView({ ...ASKED, status: 'decided' }), ParseError);
   assert.throws(() => parseDecisionView({ ...ASKED, options: [] }), ParseError);
   assert.throws(() => parseDecisionView({ ...ASKED, questionId: 'abc' }));
+});
+
+test('an option may come without a reason, but the recommended one carries its own', () => {
+  const bare = [{ text: 'Yes', reason: null }, { text: 'No', reason: 'it breaks v1 clients' }];
+  assert.equal(parseDecisionView({ ...ASKED, options: bare, recommended: null }).status, 'waiting');
+  assert.deepEqual(optionLines(parseDecisionView({ ...ASKED, options: bare, recommended: 2 }).status === 'waiting' ? bare : [], 2), [
+    '1. Yes',
+    '2. No (recommended): it breaks v1 clients',
+  ]);
+  assert.throws(() => parseDecisionView({ ...ASKED, options: bare, recommended: 1 }), /recommended option 1 needs its reason/);
+  assert.throws(() => parseDecisionView({ ...ASKED, recommended: 3 }), /3 is not an option from 1 to 2/);
+  assert.throws(() => parseDecisionView({ ...ASKED, recommended: undefined }), ParseError);
 });
 
 test('reads a reply outcome and refuses an unknown reason', () => {

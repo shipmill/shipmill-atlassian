@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { NEEDS_DECISION, commentId, type Release } from '@shipmill-atlassian/shared/release';
-import { askDecisions } from './ask';
+import { SHIPMILL, askDecisions } from './ask';
 import { FakeJira, FakeLog, LEAD } from './fake-jira';
 import { seedRelease } from './fixtures';
 import { findDecisions, pullRequestDecisions, type Decision } from './finder';
@@ -49,7 +49,7 @@ async function askedSeed(): Promise<{ release: Release; jira: FakeJira }> {
   const release = await seedRelease();
   const labelled = await findDecisions(release, { llm: false, implicit: { find: async () => [] } });
   const jira = new FakeJira();
-  await askDecisions(release, [IMPLICIT, ...labelled], { jira, preparer: templatePreparer, now: ticking('2026-12-03T09:00:00.000Z') });
+  await askDecisions(release, [IMPLICIT, ...labelled], { jira, preparer: templatePreparer, now: ticking('2026-12-03T09:00:00.000Z'), askedBy: SHIPMILL });
   return { release: relabelled(release, jira), jira };
 }
 
@@ -62,7 +62,7 @@ test('on the seed the panel lists the three decisions oldest first, who each wai
     [
       [HRB4, LEAD.displayName, '2026-12-03T09:01:00.000Z'],
       [HRB2, 'Dana Okafor', '2026-12-03T09:02:00.000Z'],
-      [HRB3, (await jira.state(HRB3))!.decider.displayName, '2026-12-03T09:03:00.000Z'],
+      [HRB3, jira.current(HRB3)!.askedOf.displayName, '2026-12-03T09:03:00.000Z'],
     ],
   );
   const hrb2 = panel.decisions[1]!;
@@ -79,8 +79,8 @@ test('on the seed the panel shows ready to ship once the decisions are answered 
   const { release: before, jira } = await askedSeed();
   const now = ticking('2026-12-03T12:00:00.000Z');
   for (const key of [HRB3, HRB4]) {
-    const state = (await jira.state(key))!;
-    const outcome = await relayReply(key, jira.reply(key, state.decider, '1'), { jira, reader: null, now, log: new FakeLog() });
+    const state = jira.current(key)!;
+    const outcome = await relayReply(key, jira.reply(key, state.askedOf, '1'), { jira, reader: null, now, log: new FakeLog() });
     assert.equal(outcome.relayed, true, `${key}: ${JSON.stringify(outcome)}`);
   }
   // Still blocked on HRB-2 alone
@@ -89,10 +89,10 @@ test('on the seed the panel shows ready to ship once the decisions are answered 
   assert.equal(midway.ready, false);
 
   // HRB-2 answered on its pull request in Bitbucket
-  const state = (await jira.state(HRB2))!;
+  const state = jira.current(HRB2)!;
   const pullRequest = before.items.find((item) => item.key === HRB2)!.pullRequests[0]!;
   const outcome = await relayPullRequestReply(
-    { kind: 'decision-reply', sentAt: now().getTime(), key: HRB2, questionId: state.questionId, author: state.decider, text: '2', pullRequest: { id: pullRequest.id, url: pullRequest.url } },
+    { kind: 'decision-reply', sentAt: now().getTime(), key: HRB2, questionId: state.id, author: state.askedOf, text: '2', pullRequest: { id: pullRequest.id, url: pullRequest.url } },
     { jira, reader: null, now, log: new FakeLog() },
   );
   assert.equal(outcome.relayed, true, JSON.stringify(outcome));
@@ -129,6 +129,7 @@ test('a labelled item not asked yet comes last, with the finder question and the
     jira,
     preparer: templatePreparer,
     now: ticking('2026-12-03T09:00:00.000Z'),
+    askedBy: SHIPMILL,
   });
   const panel = await releasePanel(release, jira, []);
   assert.deepEqual(

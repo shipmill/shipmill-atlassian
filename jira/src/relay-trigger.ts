@@ -3,7 +3,7 @@ import { chat } from '@forge/llm';
 import { jiraKey, projectKey } from '@shipmill-atlassian/shared/jira-key';
 import { boolean, nonEmpty, object } from '@shipmill-atlassian/shared/parse';
 import { commentId } from '@shipmill-atlassian/shared/release';
-import { askDecisions, type AskOutcome } from './ask';
+import { SHIPMILL, askDecisions, type AskOutcome } from './ask';
 import { forgeConfluence, siteUrl } from './confluence';
 import { forgeDecisionJira } from './decision-jira';
 import { parseLoggedDecision, queuedDecisionLog, writeDecision, type DecisionLog } from './decision-log';
@@ -70,6 +70,7 @@ export async function onPrepareRelease(event: { body: Record<string, unknown> },
     jira: forgeDecisionJira,
     preparer: withGraph(llm ? llmPreparer(chat) : templatePreparer, preparerGraph(context, carried)),
     now: () => new Date(),
+    askedBy: SHIPMILL,
   });
   console.log(`prepare ${project} ${version} (llm ${llm}): ${JSON.stringify(outcomes)}`);
   return outcomes;

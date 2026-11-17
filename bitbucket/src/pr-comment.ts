@@ -1,11 +1,11 @@
-import { optionLine, type AskedQuestion } from '@shipmill-atlassian/shared/decision';
+import { optionLines, type AskedQuestion } from '@shipmill-atlassian/shared/decision';
 import type { JiraKey } from '@shipmill-atlassian/shared/jira-key';
 import type { Person } from '@shipmill-atlassian/shared/release';
 import { DECISION_TASK_PREFIX } from './holds';
 
 // The Markdown shipmill posts on a pull request: the question in the frame of shipmill's
 // needs-decision protocol (the decider mentioned, the options numbered with the
-// recommendation first, the reply line), the task that holds the merge, the relay "Decision
+// recommendation marked, the reply line), the task that holds the merge, the relay "Decision
 // by `@x`, relayed by shipmill", and the note asking for a number. The protocol's hidden
 // marker line lives in the app's storage instead (see question-store.ts).
 
@@ -28,7 +28,7 @@ export function questionBody(key: JiraKey, asked: AskedQuestion): string {
   return [
     `${mention(asked.decider)} Decision needed: ${asked.question}`,
     '',
-    ...asked.options.map((option, index) => `${index + 1}. ${optionLine(option, index)}`),
+    ...optionLines(asked.options, asked.recommended),
     '',
     `Evidence: asked on ${key} in Jira, the work item this pull request names; the answer is recorded there.`,
     '',

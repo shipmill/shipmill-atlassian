@@ -9,7 +9,7 @@ export type ItemState = {
   labels: readonly string[];
   // Names of its fix versions
   fixVersions: readonly string[];
-  // Whether shipmill recorded a question on it (the shipmill-decision entity property)
+  // Whether shipmill recorded a question on it (the shipmill-questions entity property)
   asked: boolean;
 };
 

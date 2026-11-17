@@ -3,15 +3,16 @@ import type { JiraKey, ProjectKey } from '@shipmill-atlassian/shared/jira-key';
 import { nonEmpty, object } from '@shipmill-atlassian/shared/parse';
 import { NEEDS_DECISION, commentId, parsePerson, type Comment, type CommentId, type Person } from '@shipmill-atlassian/shared/release';
 import type { Adf } from './comment';
-import { PROPERTY, parseDecisionState, type DecisionState } from './decision-state';
+import { PROPERTY, parseProperty, propertyValue, type Question } from './question';
 import { jiraComment } from './reader';
 
 // The Jira writes the preparer and the relay make, as an interface so tests run them on a
 // fake. Every call is as the app, so the comments show as shipmill's.
 
 export interface DecisionJira {
-  state(key: JiraKey): Promise<DecisionState | undefined>;
-  setState(key: JiraKey, state: DecisionState): Promise<void>;
+  // Every question asked on the work item, oldest first; none when nothing was asked
+  questions(key: JiraKey): Promise<Question[]>;
+  setQuestions(key: JiraKey, questions: readonly Question[]): Promise<void>;
   comment(key: JiraKey, id: CommentId): Promise<Comment>;
   postComment(key: JiraKey, body: Adf): Promise<CommentId>;
   label(key: JiraKey, present: boolean): Promise<void>;
@@ -26,20 +27,22 @@ async function checked(response: APIResponse, what: string): Promise<APIResponse
 const JSON_HEADERS = { 'Content-Type': 'application/json', Accept: 'application/json' };
 
 export const forgeDecisionJira: DecisionJira = {
-  async state(key) {
+  async questions(key) {
     const response = await api.asApp().requestJira(route`/rest/api/3/issue/${key}/properties/${PROPERTY}`, {
       headers: { Accept: 'application/json' },
     });
-    if (response.status === 404) return undefined;
+    if (response.status === 404) return [];
     const body = object(await (await checked(response, `reading ${PROPERTY} on ${key}`)).json(), `${key}.${PROPERTY}`);
-    return parseDecisionState(body.value, `${key}.${PROPERTY}`);
+    return parseProperty(body.value, `${key}.${PROPERTY}`);
   },
-  async setState(key, state) {
+  async setQuestions(key, questions) {
+    const { value, dropped } = propertyValue(questions);
+    if (dropped > 0) console.warn(`${key}: the ${dropped} oldest closed questions left ${PROPERTY} to fit Jira's limit`);
     await checked(
       await api.asApp().requestJira(route`/rest/api/3/issue/${key}/properties/${PROPERTY}`, {
         method: 'PUT',
         headers: JSON_HEADERS,
-        body: JSON.stringify(state),
+        body: JSON.stringify(value),
       }),
       `writing ${PROPERTY} on ${key}`,
     );
