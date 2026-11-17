@@ -77,6 +77,20 @@ export async function readWorkItem(
   return { item: await workItem(rest, pullRequests, issue, `issue(${key})`), fixVersions };
 }
 
+// The work item as far as asking a question on it needs: its labels and the people on it.
+// undefined when the site has none by that key
+export async function readAskedItem(issues: IssueRest, key: JiraKey): Promise<Pick<WorkItem, 'key' | 'labels' | 'owner' | 'reporter'> | undefined> {
+  const raw = await issues.issue(key, ['labels', 'assignee', 'reporter']);
+  if (raw === undefined) return undefined;
+  const fields = object(object(raw, `issue(${key})`).fields, `issue(${key}).fields`);
+  return {
+    key,
+    labels: list(fields.labels, `issue(${key}).fields.labels`, nonEmpty),
+    owner: person(fields.assignee, `issue(${key}).fields.assignee`),
+    reporter: person(fields.reporter, `issue(${key}).fields.reporter`),
+  };
+}
+
 async function workItem(rest: JiraRest, pullRequests: PullRequestLookup, issue: Fields, path: string): Promise<WorkItem> {
   const key = jiraKey(nonEmpty(issue.key, `${path}.key`));
   const at = `${path}(${key})`;

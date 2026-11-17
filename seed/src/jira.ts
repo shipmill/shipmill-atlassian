@@ -10,8 +10,8 @@ import type { ItemState, JiraAction, JiraState } from './plan';
 // items; a property and work items read by id are not
 const MANIFEST = 'shipmill-seed';
 const TEMPLATE = 'com.pyxis.greenhopper.jira:gh-simplified-kanban-classic';
-// Where the Jira app records what it asked on a work item (jira/src/decision-state.ts)
-export const DECISION_PROPERTY = 'shipmill-decision';
+// Where the Jira app records what it asked on a work item (jira/src/question.ts)
+export const DECISION_PROPERTY = 'shipmill-questions';
 
 export class Jira {
   readonly #http: Http;

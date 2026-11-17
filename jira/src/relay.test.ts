@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import type { Person } from '@shipmill-atlassian/shared/release';
-import { askDecisions } from './ask';
+import { SHIPMILL, askDecisions } from './ask';
 import { FakeJira, FakeLog, toolResponse } from './fake-jira';
 import { seedRelease } from './fixtures';
 import { findDecisions } from './finder';
@@ -25,7 +25,7 @@ async function asked(): Promise<FakeJira> {
   const release = await seedRelease();
   const decisions = await findDecisions(release, { llm: false, implicit: { find: async () => [] } });
   const jira = new FakeJira();
-  await askDecisions(release, decisions, { jira, preparer: templatePreparer, now: NOW });
+  await askDecisions(release, decisions, { jira, preparer: templatePreparer, now: NOW, askedBy: SHIPMILL });
   return jira;
 }
 
@@ -61,9 +61,13 @@ test('with the LLM off a number from the decider ends the wait: relay comment, l
     ],
   });
   assert.deepEqual(jira.labels.at(-1), { key: HRB2, present: false });
-  const state = jira.states.get(HRB2);
-  assert.equal(state?.status, 'decided');
-  assert.equal(state?.status === 'decided' ? state.replyId : null, reply);
+  const state = jira.current(HRB2);
+  if (state?.status !== 'answered') throw new Error(`expected answered, got ${state?.status}`);
+  assert.equal(state.replyId, reply);
+  // The record closes with the answer, who gave it and when
+  assert.deepEqual(state.answer, { kind: 'option', number: 2 });
+  assert.deepEqual(state.answeredBy, DANA);
+  assert.equal(state.answeredAt, NOW().toISOString());
 
   // A second reply after the decision changes nothing
   const later = jira.reply(HRB2, DANA, '1');
@@ -77,7 +81,7 @@ test('with the LLM off free text gets a note and the question stays open', async
   assert.deepEqual(await relayReply(HRB2, reply, { jira, reader: null, now: NOW, log: new FakeLog() }), { key: HRB2, relayed: false, reason: 'unread' });
   assert.equal(jira.posted(HRB2).length, before + 1);
   assert.match(jira.posted(HRB2).at(-1)!.text, /Reply with a number from 1 to 3; the decision stays open/);
-  assert.equal(jira.states.get(HRB2)?.status, 'waiting');
+  assert.equal(jira.current(HRB2)?.status, 'waiting');
   assert.deepEqual(jira.labels, []);
 });
 
@@ -92,20 +96,19 @@ test('only a newer comment by the person asked counts', async () => {
   const jira = await asked();
   const outsider = jira.reply(HRB2, OUTSIDER, '1');
   assert.deepEqual(await relayReply(HRB2, outsider, { jira, reader: null, now: NOW, log: new FakeLog() }), { key: HRB2, relayed: false, reason: 'not-decider' });
-  const question = jira.states.get(HRB2)!.questionId;
+  const question = jira.current(HRB2)!.id;
   assert.deepEqual(await relayReply(HRB2, question, { jira, reader: null, now: NOW, log: new FakeLog() }), { key: HRB2, relayed: false, reason: 'not-newer' });
   const notAsked = jiraKey('HRB-5');
   const reply = jira.reply(notAsked, DANA, '1');
   assert.deepEqual(await relayReply(notAsked, reply, { jira, reader: null, now: NOW, log: new FakeLog() }), { key: notAsked, relayed: false, reason: 'no-question' });
-  assert.equal(jira.states.get(HRB2)?.status, 'waiting');
+  assert.equal(jira.current(HRB2)?.status, 'waiting');
   assert.deepEqual(jira.labels, []);
 });
 
 // With the LLM on: a question asked with it on, and Claude reading the free-text reply
 async function askedWithLlm(): Promise<FakeJira> {
   const jira = await asked();
-  const state = jira.states.get(HRB2)!;
-  await jira.setState(HRB2, { ...state, llm: true });
+  await jira.setQuestions(HRB2, [{ ...jira.current(HRB2)!, llm: true }]);
   return jira;
 }
 
@@ -151,5 +154,5 @@ test('refuses an LLM reading out of shape', async () => {
     const reply = jira.reply(HRB2, DANA, 'something');
     await assert.rejects(relayReply(HRB2, reply, { jira, reader, now: NOW, log: new FakeLog() }), (error) => error instanceof ReplyError || error instanceof Error);
   }
-  assert.equal(jira.states.get(HRB2)?.status, 'waiting');
+  assert.equal(jira.current(HRB2)?.status, 'waiting');
 });

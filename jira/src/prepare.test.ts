@@ -3,8 +3,8 @@ import { test } from 'node:test';
 import type { Prompt } from '@forge/llm';
 import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { commentId, type Release } from '@shipmill-atlassian/shared/release';
-import { askDecisions } from './ask';
-import { MARKER, frameText, questionComment } from './comment';
+import { SHIPMILL, askDecisions } from './ask';
+import { MARKER, frameText, preparedFrame, questionComment } from './comment';
 import { FakeJira, LEAD, toolResponse } from './fake-jira';
 import { seedRelease } from './fixtures';
 import { findDecisions, type Decision } from './finder';
@@ -34,7 +34,7 @@ async function prepareFirst(): Promise<Prepared> {
 
 test('with the LLM off the question is the needs-decision frame, options read from "A, or B?"', async () => {
   assert.equal(
-    frameText(await prepareFirst()),
+    frameText(preparedFrame(await prepareFirst())),
     [
       MARKER,
       '@Dana Okafor Decision needed: retire v1 tokens in 2.4, or keep them for one more release?',
@@ -73,12 +73,12 @@ test('every seeded decision prepares to the frame, from the description, a comme
   for (const decision of [...decisions, summaryOnly]) {
     const item = release.items.find((candidate) => candidate.key === decision.key)!;
     const prepared = await templatePreparer.prepare(decision, item, release, decision.askOf ?? LEAD);
-    assertFrame(frameText(prepared), false);
+    assertFrame(frameText(preparedFrame(prepared)), false);
   }
 });
 
 test('the ADF comment mentions the decider and numbers the options as an ordered list', async () => {
-  const body = questionComment(await prepareFirst());
+  const body = questionComment(preparedFrame(await prepareFirst()));
   const [question, options, evidence, reply] = body.content;
   assert.deepEqual(question?.content[0], { type: 'mention', attrs: { id: '712020:dana', text: '@Dana Okafor' } });
   assert.equal(options?.type, 'orderedList');
@@ -110,7 +110,7 @@ test('with the LLM on Claude writes the question and options; the evidence and d
   assert.equal(prepared.llm, true);
   assert.equal(prepared.options[0]?.text, 'Run it in a separate maintenance window');
   assert.match(evidenceText(prepared.evidence), /^asked by Seed Bot in a comment on .*, found by Claude: "Do we run this migration/);
-  assertFrame(frameText(prepared), true);
+  assertFrame(frameText(preparedFrame(prepared)), true);
 });
 
 test('refuses a prepared decision out of shape', async () => {
@@ -135,21 +135,21 @@ test('refuses a prepared decision out of shape', async () => {
 test('asking posts each question, labels the unlabelled one, records the wait, and never asks twice', async () => {
   const { release, decisions } = await seedDecisions();
   const jira = new FakeJira();
-  const outcomes = await askDecisions(release, decisions, { jira, preparer: templatePreparer, now: NOW });
+  const outcomes = await askDecisions(release, decisions, { jira, preparer: templatePreparer, now: NOW, askedBy: SHIPMILL });
   assert.deepEqual(outcomes.map((o) => [o.key, o.asked]), [['HRB-2', true], ['HRB-3', true], ['HRB-4', true]]);
   // HRB-2 and HRB-3 carry the label already; the implicit HRB-4 gets it
   assert.deepEqual(jira.labels, [{ key: 'HRB-4', present: true }]);
   // Nobody asked on HRB-4's decision, so the project lead decides, read once
-  assert.equal(jira.states.get(jiraKey('HRB-4'))?.decider.displayName, 'Project Lead');
+  assert.equal(jira.current(jiraKey('HRB-4'))?.askedOf.displayName, 'Project Lead');
   assert.equal(jira.leadCalls, 1);
-  const state = jira.states.get(jiraKey('HRB-2'));
+  const state = jira.current(jiraKey('HRB-2'));
   assert.equal(state?.status, 'waiting');
-  assert.equal(state?.questionId, outcomes[0]?.asked === true ? outcomes[0].questionId : undefined);
+  assert.equal(state?.id, outcomes[0]?.asked === true ? outcomes[0].questionId : undefined);
   assert.equal(state?.askedAt, '2026-12-03T09:00:00.000Z');
   assert.equal(state?.llm, false);
   assert.match(jira.posted(jiraKey('HRB-2'))[0]!.text, /^@Dana Okafor Decision needed: retire v1 tokens/);
 
-  const again = await askDecisions(release, decisions, { jira, preparer: templatePreparer, now: NOW });
+  const again = await askDecisions(release, decisions, { jira, preparer: templatePreparer, now: NOW, askedBy: SHIPMILL });
   assert.deepEqual(again.map((o) => o.asked), [false, false, false]);
   assert.equal(jira.posted(jiraKey('HRB-2')).length, 1);
 });

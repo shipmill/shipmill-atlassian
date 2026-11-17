@@ -3,6 +3,7 @@ import type { DecisionJira } from './decision-jira';
 import { labelledDecisions } from './finder';
 import { hasGraphEvidence } from './prepare';
 import type { GraphLookups, WorkItemGraph } from './graph';
+import { current } from './question';
 
 // "Ask decisions" on the release panel: the resolver runs as the user who pressed it, the only
 // place the Teamwork Graph answers, so it reads the graph here for the items the prepare may
@@ -13,12 +14,12 @@ import type { GraphLookups, WorkItemGraph } from './graph';
 export async function graphForAsk(
   release: Release,
   llm: boolean,
-  jira: Pick<DecisionJira, 'state'>,
+  jira: Pick<DecisionJira, 'questions'>,
   graph: WorkItemGraph,
 ): Promise<GraphLookups> {
   const candidates = llm ? release.items.map((item) => item.key) : labelledDecisions(release.items).map((decision) => decision.key);
   const unasked = [];
-  for (const key of candidates) if ((await jira.state(key))?.status !== 'waiting') unasked.push(key);
+  for (const key of candidates) if (current(await jira.questions(key))?.status !== 'waiting') unasked.push(key);
   const lookups = await Promise.all(unasked.map(async (key) => [key, await graph.lookup(key)] as const));
   return Object.fromEntries(lookups);
 }

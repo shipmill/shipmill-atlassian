@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { commentId, type Person } from '@shipmill-atlassian/shared/release';
-import { askDecisions } from './ask';
+import { SHIPMILL, askDecisions } from './ask';
 import {
   DecisionLogError,
   decisionRow,
@@ -147,10 +147,10 @@ test('two relays at once on one project write one page with two rows', async () 
   const confluence = new FakeConfluence();
   const queue = forgeQueue((decision) => writeDecision(decision, { space: spaceKey('DOCS'), confluence, site }));
   const log = queuedDecisionLog(queue.push);
-  const state = jira.states.get(HRB3)!;
+  const state = jira.current(HRB3)!;
   await Promise.all([
     relayReply(HRB2, jira.reply(HRB2, DANA, '2'), { jira, reader: null, now: NOW, log }),
-    relayReply(HRB3, jira.reply(HRB3, state.decider, '1'), { jira, reader: null, now: NOW, log }),
+    relayReply(HRB3, jira.reply(HRB3, state.askedOf, '1'), { jira, reader: null, now: NOW, log }),
   ]);
   await queue.drained();
   const pages = confluence.titled('Release decisions: HRB');
@@ -204,14 +204,14 @@ async function asked(): Promise<FakeJira> {
   const release = await seedRelease();
   const decisions = await findDecisions(release, { llm: false, implicit: { find: async () => [] } });
   const jira = new FakeJira();
-  await askDecisions(release, decisions, { jira, preparer: templatePreparer, now: NOW });
+  await askDecisions(release, decisions, { jira, preparer: templatePreparer, now: NOW, askedBy: SHIPMILL });
   return jira;
 }
 
 test('a reply in Jira that ends the wait goes to the log with its answer and reply', async () => {
   const jira = await asked();
   const log = new FakeLog();
-  const question = jira.states.get(HRB2)!.question;
+  const question = jira.current(HRB2)!.question;
   const unread = jira.reply(HRB2, DANA, 'not sure yet');
   await relayReply(HRB2, unread, { jira, reader: null, now: NOW, log });
   assert.deepEqual(log.recorded, [], 'a reply that decides nothing is not logged');
@@ -234,30 +234,30 @@ test('a failed log hand-off leaves the decision recorded', async () => {
   const jira = await asked();
   const failing = { record: async () => { throw new Error('queue down'); } };
   await assert.rejects(relayReply(HRB2, jira.reply(HRB2, DANA, '1'), { jira, reader: null, now: NOW, log: failing }), /queue down/);
-  assert.equal(jira.states.get(HRB2)?.status, 'decided');
+  assert.equal(jira.current(HRB2)?.status, 'answered');
   assert.deepEqual(jira.labels.at(-1), { key: HRB2, present: false });
 });
 
 test('a reply on a pull request goes to the log with shipmill\'s relay comment as the reply', async () => {
   const jira = await asked();
   const log = new FakeLog();
-  const state = jira.states.get(HRB2)!;
+  const state = jira.current(HRB2)!;
   const outcome = await relayPullRequestReply(
     {
       kind: 'decision-reply',
       sentAt: NOW().getTime(),
       key: HRB2,
-      questionId: state.questionId,
-      author: state.decider,
+      questionId: state.id,
+      author: state.askedOf,
       text: '3',
       pullRequest: { id: 5, url: 'https://bitbucket.org/acme/harbor/pull-requests/5' },
     },
     { jira, reader: null, now: NOW, log },
   );
   assert.equal(outcome.relayed, true);
-  const decided = jira.states.get(HRB2)!;
-  assert.equal(decided.status, 'decided');
+  const decided = jira.current(HRB2)!;
+  assert.equal(decided.status, 'answered');
   assert.equal(log.recorded.length, 1);
-  assert.equal(log.recorded[0]?.replyId, decided.status === 'decided' ? decided.replyId : null);
+  assert.equal(log.recorded[0]?.replyId, decided.status === 'answered' ? decided.replyId : null);
   assert.match(log.recorded[0]!.answer, /^option 3, /);
 });

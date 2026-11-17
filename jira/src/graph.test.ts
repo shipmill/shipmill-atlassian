@@ -5,9 +5,9 @@ import { jiraKey } from '@shipmill-atlassian/shared/jira-key';
 import { ParseError } from '@shipmill-atlassian/shared/parse';
 import type { LinkedPullRequest } from '@shipmill-atlassian/shared/pull-requests';
 import type { Release } from '@shipmill-atlassian/shared/release';
-import { askDecisions } from './ask';
+import { SHIPMILL, askDecisions } from './ask';
 import { queuedText } from './ask-queued';
-import { frameText, questionComment } from './comment';
+import { frameText, preparedFrame, questionComment } from './comment';
 import { FakeJira } from './fake-jira';
 import { seedRelease } from './fixtures';
 import { findDecisions, type Decision } from './finder';
@@ -106,7 +106,7 @@ test('the prepared comment on a seeded decision cites the graph evidence and who
   const lines: string[] = [];
   const preparer = withGraph(templatePreparer, siteGraph(new RecordedGraph(SEED_GRAPH), ISSUE_IDS, CLOUD), (line) => lines.push(line));
   const prepared = await preparer.prepare(decision, item, release, decision.askOf!);
-  const evidence = frameText(prepared).split('\n').find((line) => line.startsWith('Evidence: '));
+  const evidence = frameText(preparedFrame(prepared)).split('\n').find((line) => line.startsWith('Evidence: '));
   assert.equal(
     evidence,
     'Evidence: asked in the description of HRB-2: "Decision needed: retire v1 tokens in 2.4, or keep them for one more release? Fourteen customers still call the API with a v1 token every week."; ' +
@@ -123,7 +123,7 @@ test('without the graph the prepared comment is unchanged, and the log says why'
   const lines: string[] = [];
   const plain = await templatePreparer.prepare(decision, item, release, decision.askOf!);
   const prepared = await withGraph(templatePreparer, unavailableGraph('no user'), (line) => lines.push(line)).prepare(decision, item, release, decision.askOf!);
-  assert.equal(frameText(prepared), frameText(plain));
+  assert.equal(frameText(preparedFrame(prepared)), frameText(preparedFrame(plain)));
   assert.deepEqual(lines, ['graph HRB-2: not read, no user']);
 });
 
@@ -148,7 +148,7 @@ test('asking a seeded release with the graph posts the graph evidence only where
   const { release, decisions } = await seedDecisions();
   const jira = new FakeJira();
   const preparer = withGraph(templatePreparer, siteGraph(new RecordedGraph(SEED_GRAPH), ISSUE_IDS, CLOUD), () => {});
-  await askDecisions(release, decisions, { jira, preparer, now: NOW });
+  await askDecisions(release, decisions, { jira, preparer, now: NOW, askedBy: SHIPMILL });
   assert.match(jira.posted(jiraKey('HRB-2'))[0]!.text, /in the Teamwork Graph, pull request harbor #2 "HRB-2 Rejects API v1 tokens/);
   assert.doesNotMatch(jira.posted(jiraKey('HRB-3'))[0]!.text, /Teamwork Graph/);
 });
@@ -191,7 +191,7 @@ test('the panel reads the graph for the labelled items not asked yet, and for ev
 
   const jira = new FakeJira();
   const { decisions } = await seedDecisions();
-  await askDecisions(release, decisions.filter((decision) => decision.key === 'HRB-2'), { jira, preparer: templatePreparer, now: NOW });
+  await askDecisions(release, decisions.filter((decision) => decision.key === 'HRB-2'), { jira, preparer: templatePreparer, now: NOW, askedBy: SHIPMILL });
   const afterAsked = await graphForAsk(release, false, jira, siteGraph(new RecordedGraph(SEED_GRAPH), ISSUE_IDS, CLOUD));
   assert.deepEqual(Object.keys(afterAsked), ['HRB-3'], 'HRB-2 waits on an answer, so it is not asked again');
 
@@ -206,11 +206,11 @@ test('the graph the panel read reaches the comment through the queue, with no us
   assert.deepEqual(carried, lookups);
 
   const direct = new FakeJira();
-  await askDecisions(release, decisions, { jira: direct, preparer: withGraph(templatePreparer, siteGraph(new RecordedGraph(SEED_GRAPH), ISSUE_IDS, CLOUD), () => {}), now: NOW });
+  await askDecisions(release, decisions, { jira: direct, preparer: withGraph(templatePreparer, siteGraph(new RecordedGraph(SEED_GRAPH), ISSUE_IDS, CLOUD), () => {}), now: NOW, askedBy: SHIPMILL });
   const queued = new FakeJira();
   const lines: string[] = [];
   const graph = preparerGraph({ installContext: `ari:cloud:jira::site/${CLOUD}` }, carried);
-  await askDecisions(release, decisions, { jira: queued, preparer: withGraph(templatePreparer, graph, (line) => lines.push(line)), now: NOW });
+  await askDecisions(release, decisions, { jira: queued, preparer: withGraph(templatePreparer, graph, (line) => lines.push(line)), now: NOW, askedBy: SHIPMILL });
   for (const key of [jiraKey('HRB-2'), jiraKey('HRB-3')]) assert.deepEqual(queued.posted(key).map((entry) => entry.text), direct.posted(key).map((entry) => entry.text));
   assert.match(queued.posted(jiraKey('HRB-2'))[0]!.text, /in the Teamwork Graph, pull request harbor #2 "HRB-2 Rejects API v1 tokens/);
   assert.ok(lines.filter((line) => line !== TEAMS_UNREAD('HRB-2')).every((line) => line.startsWith('graph HRB-3: ')), 'only HRB-3 has empty lists to explain');
@@ -222,10 +222,10 @@ test('without graph scopes or results, the comment from the panel is unchanged a
   const lookups = await carriedThroughQueue(await graphForAsk(release, false, new FakeJira(), siteGraph(new RecordedGraph(new Map()), ISSUE_IDS, CLOUD)));
   assert.deepEqual(graphFound(lookups), []);
   const plain = new FakeJira();
-  await askDecisions(release, decisions, { jira: plain, preparer: templatePreparer, now: NOW });
+  await askDecisions(release, decisions, { jira: plain, preparer: templatePreparer, now: NOW, askedBy: SHIPMILL });
   const queued = new FakeJira();
   const lines: string[] = [];
-  await askDecisions(release, decisions, { jira: queued, preparer: withGraph(templatePreparer, carriedGraph(lookups), (line) => lines.push(line)), now: NOW });
+  await askDecisions(release, decisions, { jira: queued, preparer: withGraph(templatePreparer, carriedGraph(lookups), (line) => lines.push(line)), now: NOW, askedBy: SHIPMILL });
   for (const key of [jiraKey('HRB-2'), jiraKey('HRB-3')]) assert.deepEqual(queued.posted(key).map((entry) => entry.text), plain.posted(key).map((entry) => entry.text));
   assert.ok(lines.includes('graph HRB-2: no deployments; either none is linked or read:graph:issue:jira, read:graph:deployment:external is not granted'));
 
@@ -277,7 +277,7 @@ test('the ADF comment links the label, with no uuid in its text', async () => {
   const item = { ...release.items.find((candidate) => candidate.key === decision.key)!, pullRequests: [HARBOR_5] };
   const graph = { lookup: async () => ({ status: 'read' as const, evidence: UUID_GRAPH, empty: [] }) };
   const prepared = await withGraph(templatePreparer, graph, () => {}).prepare(decision, item, release, decision.askOf!);
-  const evidence = questionComment(prepared).content[2]!;
+  const evidence = questionComment(preparedFrame(prepared)).content[2]!;
   assert.equal(evidence.type, 'paragraph');
   const inline = evidence.type === 'paragraph' ? evidence.content : [];
   assert.ok(inline.some((node) => node.type === 'text' && node.text === 'harbor #5' && JSON.stringify(node.marks) === JSON.stringify([{ type: 'link', attrs: { href: UUID_URL } }])));

@@ -4,7 +4,8 @@ import type { JiraKey } from '@shipmill-atlassian/shared/jira-key';
 // The Jira REST calls the release reader makes, as an interface so tests replay recorded
 // responses. Each returns the response body as JSON; the reader checks its shape.
 
-export type SearchRequest = { jql: string; fields: string[]; maxResults: number; nextPageToken?: string };
+// properties: the work item properties to return with each item, five at most
+export type SearchRequest = { jql: string; fields: string[]; maxResults: number; nextPageToken?: string; properties?: string[] };
 
 export interface JiraRest {
   search(request: SearchRequest): Promise<unknown>;

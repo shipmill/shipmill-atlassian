@@ -7,7 +7,7 @@ import { jiraKey, projectKey } from '@shipmill-atlassian/shared/jira-key';
 import type { Release, WorkItem } from '@shipmill-atlassian/shared/release';
 import { decisionTaskQuestion } from '../../bitbucket/src/holds';
 import { parsePolicy } from '../../bitbucket/src/policy';
-import { PROPERTY } from '../../jira/src/decision-state';
+import { PROPERTY } from '../../jira/src/question';
 import { labelledDecisions } from '../../jira/src/finder';
 import { templateOptions } from '../../jira/src/prepare';
 import { DECISION_PROPERTY } from './jira';

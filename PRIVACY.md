@@ -16,8 +16,9 @@ Per install, in Atlassian's Forge storage: the secret that pairs the two apps, t
 web trigger address (in the Bitbucket app), whether Claude is switched on, the Confluence space of the decision log, and, in the
 Bitbucket app, which comment and task asked each decision on a pull request and who was
 asked. What the apps
-write back, comments, labels, pull request tasks, and the `shipmill-decision` property on a
-work item (the question asked, its options, who decides and their answer), lives in your Jira
+write back, comments, labels, pull request tasks, and the `shipmill-questions` property on a
+work item (each question asked, its options, the agent that asked and the account it runs as,
+who is asked, and the answer with who gave it and when), lives in your Jira
 and Bitbucket like any other comment. With a decision log space set, the Jira app also writes
 a page per project in that Confluence space, with a row per decision: the work item, the
 question, the answer, who decided and when.

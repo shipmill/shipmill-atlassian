@@ -184,7 +184,7 @@ so every run, a judge's install and the video start from the same data:
 It reads what exists first and changes only what differs, so a second run changes nothing,
 and a run after a demo puts the release back:
 
-- a work item asked or answered loses shipmill's record (the `shipmill-decision` property),
+- a work item asked or answered loses shipmill's record (the `shipmill-questions` property),
   so the app asks it again; its comments stay, since a reply counts only when it is newer
   than the question it answers (and a person can't delete the app's comments)
 - labels and the fix version go back to the seed's, so a relayed decision gets its
@@ -274,7 +274,8 @@ Reply here with a number; shipmill takes this up as soon as you reply.
 
 It mentions the person who decides (the item's assignee, else its reporter, else the
 project lead), adds the `needs-decision` label when the item lacks it, and records the
-question in the item's `shipmill-decision` property, which stands in for the protocol's
+question in the item's `shipmill-questions` property (see
+[The question as a record](#the-question-as-a-record)), which stands in for the protocol's
 hidden marker line: Jira comments have no hidden text. An item already waiting is not asked
 again.
 
@@ -284,8 +285,8 @@ again.
   the alternatives an "A, or B?" question names; a reply is read as an option number
 
 A newer comment by the person asked ends the wait: the app posts "Decision by `@Dana Okafor`,
-relayed by shipmill" with the answer, removes the label, and records the answer in the
-property. Anyone else's comment never counts. A reply starting with an option number is read
+relayed by shipmill" with the answer, removes the label, and closes the question's record
+with the answer, who gave it and when. Anyone else's comment never counts. A reply starting with an option number is read
 by code; with the LLM off, any other reply gets a note asking for a number, and with it on,
 a reply Claude reads as no decision yet (a question back, "let me check") keeps the wait
 without a note. A question asked with the LLM off is answered by number even if the switch
@@ -297,7 +298,53 @@ version itself, so someone moves the item in Jira.
 The release panel's Ask decisions button starts it for the picked fix version (see
 [The release panel](#the-release-panel)). In development the `dev` web trigger can start it
 too: a signed `{"action":"prepare","project":"HRB","version":"2.4","llm":false}` asks the
-release's decisions, and `{"action":"decision","key":"HRB-2"}` shows what the item waits on.
+release's decisions, and `{"action":"decision","key":"HRB-2"}` shows every question recorded
+on the item.
+
+### The question as a record
+
+Every question asked on a work item is a record, and the comment is its visible form. A
+record holds the question, its options, the recommended option with its reason (or none),
+whether it is routine or careful, the agent that asked and the Atlassian account it runs
+as, the work item, who is asked, when, and how it ended:
+
+| Status | What happened | What the record adds |
+|---|---|---|
+| `waiting` | Asked, and the person has not answered | |
+| `answered` | The person asked replied | The answer, who gave it, when, and the reply's comment |
+| `answered-from-record` | The agent went on by the answer an earlier question got, and no person was asked | That answer, who gave it and when, the earlier question, and when the agent took it |
+| `withdrawn` | The asker took the question back | Who withdrew it and when |
+
+A work item holds one open question at a time, so a reply in its thread answers that one.
+Once it is answered or withdrawn the item can be asked again; the earlier records stay.
+
+**Where the records live.** In Jira, in the work item's `shipmill-questions` entity
+property: the item's questions, oldest first, the last one being the current one. Jira REST
+reads a work item property from whichever install serves a call, which Forge storage does
+not: storage is per install, and where the app is also installed in Confluence the MCP
+calls are served from that install. The queue lists from Jira's own index of the property
+(a `jira:entityProperty` module): the status of the current question, the account asked,
+the account whose agent asked, and how many answered questions the item holds are JQL
+fields (`agentQuestionStatus`, `agentQuestionAskedOf`, `agentQuestionAskedBy`,
+`agentQuestionsAnswered`), so the questions waiting in a project, or on one person, are one
+search that returns the records with the work items.
+
+What that costs:
+
+- **No new scope.** The property is read and written with `read:jira-work` and
+  `write:jira-work`, which the app already has, and the index is a manifest module, so an
+  upgrade asks for no new consent
+- **32 KB a work item.** Jira takes 32,768 bytes in a property. A question is one to three
+  kilobytes, so an item holds ten or more; past the limit the oldest closed questions leave
+  the record (their comments stay on the work item), never the current one
+- **The search trails a write.** Jira's index follows a property write by a moment, so a
+  question just asked or answered can be missing or stale in a list for a few seconds. The
+  reads check each record they get back, and reading one work item's question goes to the
+  property itself and is always current
+- **The asking account is an id.** The record names the person an agent runs as by account
+  id, not by name: reading a user's name takes `read:jira-user`, a new scope
+- **Records the seed clears are gone.** The property is the record; nothing else holds a copy
+
 
 ## The Confluence decision log
 
@@ -464,14 +511,14 @@ outside Jira:
 | Tool | What |
 |---|---|
 | `list-release-decisions` | A fix version's blocking decisions, as the release panel lists them, and the project's open fix versions (`project`, optional `version`) |
-| `ask-decision` | Asks one blocking decision the way Ask decisions does: shipmill posts the prepared question on the work item and records it (`issueKey`, `version`). The question comes from the template, with no LLM call; a decision already waiting is not asked again |
-| `read-decision-answer` | Where a decision stands: not asked, waiting (question, numbered options, who it waits on) or decided (the relayed answer) (`issueKey`) |
+| `ask-decision` | Asks a question on a work item and records it. With `question`: the agent's own question, with `options` (two to four, one per line), `recommended` (an option number) with its `reason`, `care` (`routine` or `careful`; careful when left out) and `agent` (its name). Without `question`: one blocking decision of `version`, prepared from the template the way Ask decisions does. Neither calls an LLM; a work item already waiting is not asked again (`issueKey`) |
+| `read-decision-answer` | Where the question on a work item stands, from its record: `not-asked`, `waiting` (question, numbered options, the recommended one, who it waits on), `answered` (the answer, who gave it and when), `answered-from-record` or `withdrawn` (`issueKey`) |
 
 Every tool runs for the person the MCP client signed in as, and never lets them read or ask
 what Jira would not: Jira is asked, as them (`/rest/api/3/mypermissions`), whether they may
 browse the project or work item, and for `ask-decision` whether they may comment on it; the
 release is read as them, so issue security hides what it hides in Jira. Only the writes
-(the question comment, the label, the decision's entity property) go as the app, as they do
+(the question comment, the label, the questions' entity property) go as the app, as they do
 from the panel, so the comment shows as shipmill's.
 
 Calling Jira as the user needs that user's consent to the app, which only a Forge UI can ask
@@ -525,6 +572,12 @@ uv run scripts/mcp-check.py ask HRB-2 2.4
 
 ```bash
 uv run scripts/mcp-check.py answer HRB-2
+```
+
+An agent's own question, with its options, the recommended one and why:
+
+```bash
+uv run scripts/mcp-check.py ask HRB-1 --agent "Claude Code" --question "Retry the webhook three times, or fail on the first error?" --option "Retry three times" --option "Fail on the first error" --recommended 1 --reason "The handler is idempotent" --care routine
 ```
 
 ## Privacy

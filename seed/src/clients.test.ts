@@ -12,7 +12,7 @@ function issue(properties?: object): object {
 }
 
 test("a work item reads back with its labels, fix versions and shipmill's record", () => {
-  assert.deepEqual(itemState(issue({ 'shipmill-decision': { status: 'waiting' } })), {
+  assert.deepEqual(itemState(issue({ 'shipmill-questions': { status: 'waiting' } })), {
     key: 'DEMO-2',
     labels: ['needs-decision'],
     fixVersions: ['2.4'],

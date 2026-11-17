@@ -66,10 +66,10 @@ async function act(fields: Fields): Promise<object> {
       await enqueuePrepare(project, nonEmpty(fields.version, 'version'), boolean(fields.llm, 'llm'));
       return { queued: true };
     }
-    // What was asked on a work item and whether it is answered
+    // Every question asked on a work item, oldest first, the last one being the current one
     case 'decision': {
       const key = jiraKey(nonEmpty(fields.key, 'key'));
-      return { key, state: (await forgeDecisionJira.state(key)) ?? null };
+      return { key, questions: await forgeDecisionJira.questions(key) };
     }
     // One queue event per case, so each case gets its own 300 s and a slow one holds up no other
     case 'eval-start': {

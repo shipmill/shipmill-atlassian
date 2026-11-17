@@ -1,22 +1,32 @@
 import { jiraKey, type JiraKey } from './jira-key';
-import { ParseError, boolean, list, nonEmpty, object, oneOf } from './parse';
+import { ParseError, boolean, list, natural, nonEmpty, object, oneOf } from './parse';
 import { commentId, parsePerson, type CommentId, type Person } from './release';
 
 // A decision shipmill asked on a Jira work item, as both apps see it: the Jira app asks it
 // and keeps the answer, the Bitbucket app asks it again on the work item's pull requests and
 // sends back a reply made there. The question is named by the Jira comment that asked it.
 
-export type DecisionOption = { text: string; reason: string };
+// reason: why, or what the option costs; an agent's own question may give one for the
+// recommended option only
+export type DecisionOption = { text: string; reason: string | null };
 
-export function optionLine(option: DecisionOption, index: number): string {
-  return index === 0 ? `${option.text} (recommended): ${option.reason}` : `${option.text}: ${option.reason}`;
+export function optionLine(option: DecisionOption, recommended: boolean): string {
+  const text = recommended ? `${option.text} (recommended)` : option.text;
+  return option.reason === null ? text : `${text}: ${option.reason}`;
+}
+
+// The options as the question numbers them, from 1; recommended is that number, or null
+export function optionLines(options: readonly DecisionOption[], recommended: number | null): string[] {
+  return options.map((option, index) => `${index + 1}. ${optionLine(option, index + 1 === recommended)}`);
 }
 
 export type AskedQuestion = {
   questionId: CommentId;
   question: string;
-  // The recommended option first
   options: DecisionOption[];
+  // The number of the recommended option, which carries its reason; null when none is.
+  // A question shipmill prepares puts it first
+  recommended: number | null;
   decider: Person;
   // Whether a free-text reply is read by Claude; with it off the reply is an option number
   llm: boolean;
@@ -30,7 +40,16 @@ export type DecisionView =
 
 export function parseDecisionOption(value: unknown, path: string): DecisionOption {
   const fields = object(value, path);
-  return { text: nonEmpty(fields.text, `${path}.text`), reason: nonEmpty(fields.reason, `${path}.reason`) };
+  return { text: nonEmpty(fields.text, `${path}.text`), reason: fields.reason === null ? null : nonEmpty(fields.reason, `${path}.reason`) };
+}
+
+export function parseRecommended(value: unknown, path: string, options: readonly DecisionOption[]): number | null {
+  if (value === null) return null;
+  const number = natural(value, path);
+  const option = options[number - 1];
+  if (number < 1 || option === undefined) throw new ParseError(path, `${number} is not an option from 1 to ${options.length}`);
+  if (option.reason === null) throw new ParseError(path, `the recommended option ${number} needs its reason`);
+  return number;
 }
 
 export function parseDecisionView(value: unknown, path = 'decision'): DecisionView {
@@ -38,10 +57,12 @@ export function parseDecisionView(value: unknown, path = 'decision'): DecisionVi
   const key = jiraKey(nonEmpty(fields.key, `${path}.key`));
   const status = oneOf(fields.status, `${path}.status`, ['none', 'waiting', 'decided'] as const);
   if (status === 'none') return { key, status };
+  const options = list(fields.options, `${path}.options`, parseDecisionOption);
   const asked: AskedQuestion = {
     questionId: commentId(nonEmpty(fields.questionId, `${path}.questionId`)),
     question: nonEmpty(fields.question, `${path}.question`),
-    options: list(fields.options, `${path}.options`, parseDecisionOption),
+    options,
+    recommended: parseRecommended(fields.recommended, `${path}.recommended`, options),
     decider: parsePerson(fields.decider, `${path}.decider`),
     llm: boolean(fields.llm, `${path}.llm`),
   };

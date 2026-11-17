@@ -4,12 +4,13 @@ import type { LinkedPullRequest } from '@shipmill-atlassian/shared/pull-requests
 import type { Person, Release } from '@shipmill-atlassian/shared/release';
 import type { DecisionJira } from './decision-jira';
 import { labelledDecisions, type PullRequestDecision } from './finder';
+import { current } from './question';
 
 // The release panel: what a fix version still waits on, oldest first, and who each decision
 // waits on. A decision blocks while its work item is labelled needs-decision, as the merge
 // check counts it, so the panel never calls the LLM and answers inside a resolver's 25 s. What
 // shipmill asked (the question, the person asked, when) comes from the item's
-// shipmill-decision property; the answer can come from Jira or from a pull request in
+// shipmill-questions property; the answer can come from Jira or from a pull request in
 // Bitbucket, so the panel names the item's pull requests as the other place to answer. A
 // decision opened on a pull request (an unresolved "Decision needed:" task) blocks the release
 // too, so the panel lists those after the work items' own and is ready only when both are empty.
@@ -35,7 +36,7 @@ export type ReleasePanel = {
 
 export async function releasePanel(
   release: Release,
-  jira: Pick<DecisionJira, 'state' | 'projectLead'>,
+  jira: Pick<DecisionJira, 'questions' | 'projectLead'>,
   onPullRequests: readonly PullRequestDecision[],
 ): Promise<ReleasePanel> {
   let lead: Person | undefined;
@@ -45,9 +46,9 @@ export async function releasePanel(
     const item = release.items.find((candidate) => candidate.key === decision.key);
     if (item === undefined) throw new Error(`${decision.key} is not in ${release.project} ${release.version}`);
     const base = { key: item.key, summary: item.summary, pullRequests: item.pullRequests };
-    const state = await jira.state(item.key);
-    if (state?.status === 'waiting') {
-      asked.push({ ...base, question: state.question, waitsOn: state.decider, askedAt: state.askedAt });
+    const question = current(await jira.questions(item.key));
+    if (question?.status === 'waiting') {
+      asked.push({ ...base, question: question.question, waitsOn: question.askedOf, askedAt: question.askedAt });
       continue;
     }
     // Labelled but not asked, or labelled again after an answer: the finder's question, and

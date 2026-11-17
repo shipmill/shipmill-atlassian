@@ -1,11 +1,12 @@
 import type { ChatResponse } from '@forge/llm';
-import type { JiraKey, ProjectKey } from '@shipmill-atlassian/shared/jira-key';
+import { projectOf, type JiraKey, type ProjectKey } from '@shipmill-atlassian/shared/jira-key';
 import { commentId, type Comment, type CommentId, type Person } from '@shipmill-atlassian/shared/release';
 import { plainText } from '@shipmill-atlassian/shared/adf';
 import type { Adf } from './comment';
 import type { DecisionJira } from './decision-jira';
 import type { DecisionLog, LoggedDecision } from './decision-log';
-import { parseDecisionState, type DecisionState } from './decision-state';
+import { current, parseProperty, propertyValue, type PropertyValue, type Question } from './question';
+import type { IndexQuery, QuestionIndex } from './question-reads';
 
 // An in-memory Jira for the preparer and relay tests. Tests only; the app never imports this.
 
@@ -14,20 +15,44 @@ export const LEAD: Person = { accountId: '557058:lead', displayName: 'Project Le
 
 export class FakeJira implements DecisionJira {
   readonly comments = new Map<CommentId, { key: JiraKey; comment: Comment; body: Adf | null }>();
-  readonly states = new Map<JiraKey, DecisionState>();
+  // The shipmill-questions property of each work item, as Jira stores it
+  readonly properties = new Map<JiraKey, PropertyValue>();
   readonly labels: { key: JiraKey; present: boolean }[] = [];
   leadCalls = 0;
   #next = 20000;
 
-  async state(key: JiraKey): Promise<DecisionState | undefined> {
-    const state = this.states.get(key);
+  async questions(key: JiraKey): Promise<Question[]> {
+    const stored = this.properties.get(key);
     // Round-trip through JSON and the parser, as the entity property does
-    return state === undefined ? undefined : parseDecisionState(JSON.parse(JSON.stringify(state)));
+    return stored === undefined ? [] : parseProperty(JSON.parse(JSON.stringify(stored)));
   }
 
-  async setState(key: JiraKey, state: DecisionState): Promise<void> {
-    this.states.set(key, parseDecisionState(JSON.parse(JSON.stringify(state))));
+  async setQuestions(key: JiraKey, questions: readonly Question[]): Promise<void> {
+    const { value } = propertyValue(questions);
+    parseProperty(JSON.parse(JSON.stringify(value)));
+    this.properties.set(key, JSON.parse(JSON.stringify(value)) as PropertyValue);
   }
+
+  // The current question on a work item, for a test to look at
+  current(key: JiraKey): Question | undefined {
+    const stored = this.properties.get(key);
+    return stored === undefined ? undefined : current(parseProperty(JSON.parse(JSON.stringify(stored))));
+  }
+
+  // Jira's JQL index of the property: it matches on the indexed fields alone, as the search does
+  readonly index: QuestionIndex = {
+    find: async (query: IndexQuery) =>
+      [...this.properties.entries()]
+        .filter(
+          ([key, stored]) =>
+            (query.project === undefined || projectOf(key) === query.project) &&
+            (query.status === undefined || stored.status === query.status) &&
+            (query.askedOf === undefined || stored.askedOf === query.askedOf) &&
+            (query.askedBy === undefined || stored.askedBy === query.askedBy) &&
+            (query.answered !== true || stored.answered > 0),
+        )
+        .map(([key, stored]) => ({ key, questions: parseProperty(JSON.parse(JSON.stringify(stored))) })),
+  };
 
   async comment(key: JiraKey, id: CommentId): Promise<Comment> {
     const found = this.comments.get(id);

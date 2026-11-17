@@ -6,11 +6,15 @@
 
     uv run scripts/mcp-check.py list HRB [2.4]
     uv run scripts/mcp-check.py ask HRB-2 2.4
+    uv run scripts/mcp-check.py ask HRB-1 --agent "Claude Code" --question "Retry, or fail?" \
+        --option "Retry three times" --option "Fail on the first error" \
+        --recommended 1 --reason "The handler is idempotent" --care routine
     uv run scripts/mcp-check.py answer HRB-2
 
 The first run prints an AUTHORIZE url: open it, sign in, pick the site and allow access; the
 browser then lands on a local callback this script listens on. The OAuth client and its
-tokens stay in tmp/mcp-check-state.json (git-ignored, mode 600); delete it to sign in again.
+tokens stay in tmp/mcp-check-state.json (git-ignored, mode 600; --state keeps them elsewhere);
+delete it to sign in again.
 An access token lasts eight hours; a later run trades the saved refresh token for a new one,
 so the sign-in is needed only once.
 Tool names carry the environment's suffix (`_development` from `forge deploy -e development`),
@@ -138,17 +142,30 @@ async def refresh_if_expired(storage: FileStorage) -> None:
     print("REFRESHED the saved access token", flush=True)
 
 
-def tool_call(args: argparse.Namespace) -> tuple[str, dict[str, str]]:
+def tool_call(args: argparse.Namespace) -> tuple[str, dict[str, str | int]]:
     if args.command == "list":
         return "list-release-decisions", {"project": args.target} | ({} if args.version is None else {"version": args.version})
     if args.command == "ask":
-        if args.version is None:
-            raise SystemExit("ask needs the fix version: ask HRB-2 2.4")
-        return "ask-decision", {"issueKey": args.target, "version": args.version}
+        if args.question is None:
+            if args.version is None:
+                raise SystemExit("ask needs the fix version (ask HRB-2 2.4) or your own question (--question)")
+            return "ask-decision", {"issueKey": args.target, "version": args.version}
+        # The agent's own question; the tool checks the rest and says what is missing
+        own: dict[str, str | int] = {"issueKey": args.target, "question": args.question}
+        if args.option:
+            own["options"] = "\n".join(args.option)
+        for name in ("recommended", "reason", "care", "agent", "version"):
+            value = getattr(args, name)
+            if value is not None:
+                own[name] = value
+        return "ask-decision", own
     return "read-decision-answer", {"issueKey": args.target}
 
 
 async def main(args: argparse.Namespace) -> None:
+    global STATE
+    if args.state is not None:
+        STATE = args.state.resolve()
     storage = FileStorage()
     await refresh_if_expired(storage)
     auth = OAuthClientProvider(
@@ -185,4 +202,11 @@ if __name__ == "__main__":
     parser.add_argument("target", help="a project key for list, a work item key for ask and answer")
     parser.add_argument("version", nargs="?", help="the fix version (optional for list)")
     parser.add_argument("--suffix", default="_development", help="the environment's tool name suffix")
+    parser.add_argument("--state", type=Path, help="where the OAuth client and tokens are kept (default tmp/mcp-check-state.json)")
+    parser.add_argument("--question", help="ask: your own question, instead of a release decision")
+    parser.add_argument("--option", action="append", help="ask: one option of your question; repeat for each")
+    parser.add_argument("--recommended", type=int, help="ask: the number of the option you recommend")
+    parser.add_argument("--reason", help="ask: why you recommend it")
+    parser.add_argument("--care", help="ask: routine or careful (careful when left out)")
+    parser.add_argument("--agent", help="ask: the name of the asking agent")
     asyncio.run(main(parser.parse_args()))

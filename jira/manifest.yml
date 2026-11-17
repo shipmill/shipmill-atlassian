@@ -42,7 +42,27 @@ modules:
     - key: decision-log-consumer
       queue: decision-log
       function: on-decision-log
-  # MCP: a coding agent lists a release's blocking decisions, asks one and reads its answer.
+  # The question records live in each work item's shipmill-questions property
+  # (jira/src/question.ts). Jira indexes these fields of it, all about the item's current
+  # question, so the questions waiting in a project are one JQL search (question-reads.ts)
+  jira:entityProperty:
+    - key: question-index
+      entityType: issue
+      propertyKey: shipmill-questions
+      values:
+        - path: status
+          type: string
+          searchAlias: agentQuestionStatus
+        - path: askedOf
+          type: string
+          searchAlias: agentQuestionAskedOf
+        - path: askedBy
+          type: string
+          searchAlias: agentQuestionAskedBy
+        - path: answered
+          type: number
+          searchAlias: agentQuestionsAnswered
+  # MCP: a coding agent lists a release's blocking decisions, asks a question and reads its answer.
   # Tools are the actions below; an admin exposes them per site (see README, "Ask from a
   # coding agent through MCP"). Each runs for the caller and checks their Jira permissions.
   action:
@@ -66,38 +86,68 @@ modules:
           required: false
           description: "The fix version name, for example 2.4; the project's first open version when left out"
     - key: ask-decision
-      name: Ask a release decision
+      name: Ask a question on a work item
       function: mcp-ask-decision
       actionVerb: CREATE
       description: >
-        Ask one blocking decision (a work item labelled needs-decision in the fix version):
-        shipmill posts its prepared question with numbered options as a Jira comment to the
-        person it waits on. Not asked twice. Returns read-decision-answer's view.
+        Ask a person a question on a Jira work item: give question, options and agent, and
+        recommended with reason where you can. Posted as a comment with numbered options;
+        not asked twice. Without question, version asks a prepared release decision.
       inputs:
         issueKey:
           title: Work item key
           type: string
           required: true
-          description: "The work item that holds the decision, for example HRB-2"
+          description: "The work item the question is about, for example HRB-2"
+        question:
+          title: Question
+          type: string
+          required: false
+          description: "Your question in one sentence, ending with a question mark"
+        options:
+          title: Options
+          type: string
+          required: false
+          description: "Two to four options, one per line, in the order they are numbered"
+        recommended:
+          title: Recommended option
+          type: integer
+          required: false
+          description: "The number of the option you recommend, from 1; leave out when you recommend none"
+        reason:
+          title: Reason
+          type: string
+          required: false
+          description: "Why you recommend that option, in one sentence; required with recommended"
+        care:
+          title: Routine or careful
+          type: string
+          required: false
+          description: "routine or careful. careful (the default): irreversible, breaking, or outside your mandate, so it is never answered in a batch"
+        agent:
+          title: Agent
+          type: string
+          required: false
+          description: "Which agent asks, for example Claude Code; required with question"
         version:
           title: Fix version
           type: string
-          required: true
-          description: "The open fix version the decision blocks, for example 2.4"
+          required: false
+          description: "Only without question: the open fix version whose blocking decision to ask, for example 2.4"
     - key: read-decision-answer
       name: Read a decision's answer
       function: mcp-read-answer
       actionVerb: GET
       description: >
-        Read where a decision shipmill asked on a Jira work item stands: not-asked, waiting
-        (the question, its numbered options and who it waits on) or decided (the answer as
-        relayed, and when).
+        Read where the question asked on a Jira work item stands, from its record: not-asked,
+        waiting (the question, its numbered options and who it waits on), answered (the
+        answer, who gave it and when), answered-from-record or withdrawn.
       inputs:
         issueKey:
           title: Work item key
           type: string
           required: true
-          description: "The work item that holds the decision, for example HRB-2"
+          description: "The work item the question was asked on, for example HRB-2"
   rovo:mcp:
     - key: release-decisions-mcp
       name: shipmill Release Decisions
